@@ -1,4 +1,4 @@
-use std::{thread::Thread, sync::{Arc, RwLock}, time::Duration};
+use std::{thread::{ spawn, sleep}, sync::{Arc, RwLock}, time::Duration};
 
 use rendering::vulkano_render;
 mod rendering;
@@ -8,18 +8,19 @@ fn main(){
 
     let idle_thread_running = running.clone();
 
-    let idle_thread = std::thread::spawn(move ||{
+    let idle_thread = spawn(move ||{
         while *idle_thread_running.read().unwrap(){
             ;
-            println!("Oydling! Later I'll be doing stuff for the game!");
+            println!("Idling! Later I'll be doing stuff for the game!");
             ;
             ;
-            std::thread::sleep(Duration::from_millis(4000));
+            sleep(Duration::from_millis(4000));
         }
-        println!("FINISHING!");
+        println!("Oh no! I'm getting terminated! Brhsshh!");
     });
 
     let threads_vec = vec![idle_thread];
-    //this will lock the current thread (main in the event loop)
+    //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
+    //otherwise it will lead to cross-platform compatibility problems
     vulkano_render(threads_vec, running);
 }
