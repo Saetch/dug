@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+use std::thread::JoinHandle;
 
 use bytemuck::{Pod, Zeroable};
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess};
@@ -186,7 +187,7 @@ fn get_command_buffers(
         .collect()
 }
 
-pub fn vulkano_render() {
+pub fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running: Arc<RwLock<bool>>) {
 
     // instance
 
@@ -345,12 +346,22 @@ pub fn vulkano_render() {
     let mut previous_fence_i = 0;
 
 
+    //TODO: create channels to communicate with threads and send a termination signal
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
             ..
         } => {
+            let mut running_lock = running.write().unwrap();
+            *running_lock = false;
+            drop(running_lock);
+
+            while let Some(cur_thread) = threads_vec.pop() {
+                cur_thread.join().unwrap();
+            }
             *control_flow = ControlFlow::Exit;
+            
         }
         Event::WindowEvent {
             event: WindowEvent::Resized(_),
