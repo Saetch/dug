@@ -1,4 +1,4 @@
-use std::{thread::Thread, sync::{Arc, RwLock}};
+use std::{thread::Thread, sync::{Arc, RwLock}, time::Duration};
 
 use rendering::vulkano_render;
 mod rendering;
@@ -11,7 +11,10 @@ fn main(){
     let idle_thread = std::thread::spawn(move ||{
         while *idle_thread_running.read().unwrap(){
             ;
-            println!("Oydling!");
+            println!("Oydling! Later I'll be doing stuff for the game!");
+            ;
+            ;
+            std::thread::sleep(Duration::from_millis(4000));
         }
         println!("FINISHING!");
     });
