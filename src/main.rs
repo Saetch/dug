@@ -1,6 +1,7 @@
 use std::{thread::{ spawn, sleep}, sync::{Arc, RwLock}, time::Duration};
 
-use rendering::vulkano_render;
+use rendering::rendering_run;
+
 mod rendering;
 fn main(){
     
@@ -22,5 +23,6 @@ fn main(){
     let threads_vec = vec![idle_thread];
     //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
     //otherwise it will lead to cross-platform compatibility problems
-    vulkano_render(threads_vec, running);
+
+    rendering_run(running, threads_vec);
 }
