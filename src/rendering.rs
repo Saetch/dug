@@ -10,7 +10,7 @@ use winit::{
 
 
 
-pub(crate) fn rendering_run(running: Arc<RwLock<bool>>, threads_vec: Vec<JoinHandle<()>>){
+pub(crate) fn rendering_run(running: Arc<RwLock<bool>>, mut threads_vec: Vec<JoinHandle<()>>){
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
@@ -29,7 +29,13 @@ pub(crate) fn rendering_run(running: Arc<RwLock<bool>>, threads_vec: Vec<JoinHan
                         ..
                     },
                 ..
-            } => *control_flow = ControlFlow::Exit,
+            } => {
+                *running.write().unwrap() = false;
+                while let Some(thr) = threads_vec.pop(){
+                    thr.join().unwrap();
+                }
+                *control_flow = ControlFlow::Exit
+            },
             _ => {}
         },
         _ => {}

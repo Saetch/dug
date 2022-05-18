@@ -11,10 +11,10 @@ fn main(){
 
     let idle_thread = spawn(move ||{
         while *idle_thread_running.read().unwrap(){
-            ;
+            
             println!("Idling! Later I'll be doing stuff for the game!");
-            ;
-            ;
+            
+
             sleep(Duration::from_millis(4000));
         }
         println!("Oh no! I'm getting terminated! Brhsshh!");
