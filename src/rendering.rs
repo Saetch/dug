@@ -1,4 +1,5 @@
 use std::{sync::{RwLock, Arc}, thread::JoinHandle};
+use rand::{thread_rng, Rng};
 use wgpu::Features;
 use winit::{
     event::*,
@@ -14,6 +15,8 @@ struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
+
+    bkcolor: wgpu::Color,
 }
 
 impl State {
@@ -66,6 +69,13 @@ impl State {
             queue,
             config,
             size,
+
+            bkcolor: wgpu::Color {            
+                r: 0.1,
+                g: 0.2,
+                b: 0.3,
+                a: 1.0,
+            },
         }
     }
      
@@ -80,6 +90,23 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
+
+        
+        match event {
+            WindowEvent::CursorMoved { device_id: _, position: _, modifiers: _ } =>{
+                let mut rng = thread_rng();
+                let val_changed = rng.gen_range(-0.1..=0.1);
+                let typechanged : u8 = rng.gen();
+                match typechanged {
+                    0 => self.bkcolor.r += val_changed,
+                    1 => self.bkcolor.g +=val_changed,
+                    2 => self.bkcolor.b += val_changed,
+                    _ => ()
+                    
+                }
+            } 
+            _ => ()
+        }
         false
     }
 
@@ -106,12 +133,7 @@ impl State {
                 view: &view,                                                //created view as target, to render to the screen, this generally is the texture destination of the colors
                 resolve_target: None,                                       //texture that will receive the resolved output, this is the same as view unless multisampling is enabled
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {            
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
-                    }),
+                    load: wgpu::LoadOp::Clear(self.bkcolor),
                     store: true,
                 },
             }],
@@ -175,7 +197,7 @@ pub(crate) async fn rendering_run(running: Arc<RwLock<bool>>, mut threads_vec: V
                     },
                 ..
             } => {
-                *running.write().unwrap() = false;
+                *running.write().unwrap() = false;                          //because no reference to running is saved, the lock is dropped immediately
                 while let Some(thr) = threads_vec.pop(){
                     thr.join().unwrap();
                 }
