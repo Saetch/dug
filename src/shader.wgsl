@@ -11,10 +11,10 @@ struct VertexOutput {
 [[stage(vertex)]]
 fn vs_main(  [[builtin(vertex_index)]] in_vertex_index: u32) -> VertexOutput {
 
-    var out: VertexOutput;
-    let x = f32(1 - i32(in_vertex_index)) * 0.5;
+    var out: VertexOutput;                                      //var means mutable and needs its type specified, let means immutable and does not change
+    let x = f32(1 - i32(in_vertex_index)) * 0.5;                //these will just resolve to the correct X and Y coordinates when fed with index 0, 1, 2
     let y = f32(i32(in_vertex_index & 1u) * 2 - 1) * 0.5;
-    out.clip_position = vec4<f32>(x, y, 0.0, 1.0);
+    out.clip_position = vec4<f32>(x, y, 0.0, 1.0);              //we specified the VertexOutput struct above and its clip_position field
     return out;
 
 }
@@ -24,7 +24,7 @@ fn vs_main(  [[builtin(vertex_index)]] in_vertex_index: u32) -> VertexOutput {
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    return vec4<f32>(0.3, 0.2, 0.1, 1.0);
+    return vec4<f32>(in.clip_position[0], in.clip_position[1], 0.1, 1.0);
 }
 
  
