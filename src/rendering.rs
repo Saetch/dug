@@ -1,6 +1,6 @@
 use std::{sync::{RwLock, Arc}, thread::JoinHandle};
 use rand::{thread_rng, Rng};
-use wgpu::Features;
+use wgpu::{Features, include_wgsl};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -15,6 +15,8 @@ struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
+
+    render_pipeline: wgpu::RenderPipeline,  //The render pipeline is needed for drawing onto a surface, using shaders
 
     bkcolor: wgpu::Color,
 }
@@ -63,19 +65,68 @@ impl State {
         surface.configure(&device, &config);
 
 
+        let shader = device.create_shader_module(&include_wgsl!("shader.wgsl"));       //here, we could also put the contents of shader.wgsl as a String into the program, but loading it from a file is more convenient. Make sure to have WGSL extension installed if you want to edit the shader.wgsl file
+        
+
+        let render_pipeline_layout =
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[],
+            push_constant_ranges: &[],
+        });
+
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main", // 1.
+                buffers: &[], // 2.
+            },
+            fragment: Some(wgpu::FragmentState { // 3.              //fragment is optional and thus wrapped in Some(), this is needed for storing color on the surface
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[wgpu::ColorTargetState { // 4.
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),         //replace pixels instead of blending
+                    write_mask: wgpu::ColorWrites::ALL,             //specify color channels (R, G, B or similiar) that can be written to. Others will be ignored 
+                }],
+            }),    
+                primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList, // 1.  //every 3 vertices in order are considered a triangle
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw, // 2.            //Ccw: Counter-clockwise. This means, that if the vertices are ordered counter-clockwise, the triangle is facing us (only the front is visible)
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },    depth_stencil: None, // 1.
+            multisample: wgpu::MultisampleState {
+                count: 1, // 2.
+                mask: !0, // 3.
+                alpha_to_coverage_enabled: false, // 4.
+            },
+            multiview: None, // 5.
+        });
+
+
         Self {
             surface,
             device,
             queue,
             config,
             size,
-
             bkcolor: wgpu::Color {            
                 r: 0.1,
                 g: 0.2,
                 b: 0.3,
                 a: 1.0,
             },
+            render_pipeline: render_pipeline
         }
     }
      
@@ -95,8 +146,8 @@ impl State {
         match event {
             WindowEvent::CursorMoved { device_id: _, position: _, modifiers: _ } =>{
                 let mut rng = thread_rng();
-                let val_changed = rng.gen_range(-0.1..=0.1);
-                let typechanged : u8 = rng.gen();
+                let val_changed = rng.gen_range(-0.005..=0.005);
+                let typechanged : u8 = rng.gen_range(0..=2);
                 match typechanged {
                     0 => self.bkcolor.r += val_changed,
                     1 => self.bkcolor.g +=val_changed,
