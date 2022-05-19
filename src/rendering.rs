@@ -37,8 +37,11 @@ impl State {
                 features: wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,            //you can get a list of supported features by calling adapter.features() or device.features()
 
                 limits: if cfg!(target_arch = "wasm32") {
+                    println!("loading web configuration");
                     wgpu::Limits::downlevel_webgl2_defaults()
+                    
                 } else {
+                    println!("loading default configuration");
                     wgpu::Limits::default()
                 },
                 label: None,
@@ -99,11 +102,11 @@ impl State {
         //a render pass is a part of a program in which the given view is drawn to.
         let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
-            color_attachments: &[wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
+            color_attachments: &[wgpu::RenderPassColorAttachment {          //color attackments describe where we are going to draw to
+                view: &view,                                                //created view as target, to render to the screen, this generally is the texture destination of the colors
+                resolve_target: None,                                       //texture that will receive the resolved output, this is the same as view unless multisampling is enabled
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {            
                         r: 0.1,
                         g: 0.2,
                         b: 0.3,
@@ -115,7 +118,8 @@ impl State {
             depth_stencil_attachment: None,
         });
         
-        drop(_render_pass);
+        drop(_render_pass);                     //this is needed, because in the previous step, the _render_pass object borrowed encoder mutably,
+                                                //  and thus we need to drop that borrow in order to use the encoder in the next step
 
             // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
