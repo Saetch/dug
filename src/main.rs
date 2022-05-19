@@ -24,5 +24,5 @@ fn main(){
     //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
     //otherwise it will lead to cross-platform compatibility problems
 
-    rendering_run(running, threads_vec);
+    pollster::block_on(rendering_run(running, threads_vec));
 }

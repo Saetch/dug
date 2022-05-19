@@ -10,6 +10,7 @@ winit = "0.26.1"
 env_logger = "0.9"
 log = "0.4"
 wgpu = "0.12"
+pollster = "0.2.5"      #can poll stuff, wait for async returns in synchronous code
 
 [profile.release_opt]
 inherits = "release"
