@@ -1,14 +1,50 @@
-use std::{sync::{RwLock, Arc}, thread::JoinHandle};
+use std::{sync::{RwLock, Arc}, thread::JoinHandle, time::SystemTime};
+use bytemuck::{Pod, Zeroable};
 use rand::{thread_rng, Rng};
-use wgpu::{Features, include_wgsl};
+use wgpu::{Features, include_wgsl, util::DeviceExt};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{WindowBuilder, Window},
 };
+use std::time::Duration;
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+struct Vertex {
+    position: [f32; 3],
+    color: [f32; 3],
+}
+    //create the actual vertices that should be drawn. This could be updated at compile time
+const VERTICES: &[Vertex] = &[
+    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+];
 
+//unsafe impl bytemuck::Pod for Vertex {}   use these for implementing Pod and Zeroable for structs, that cant derive these traits
+//unsafe impl bytemuck::Zeroable for Vertex {}
 
+impl Vertex {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,         //defines how wide a vertex is (C: sizeof()), in order to read the next vertex, the shader will read this many bytes further into the buffer
+            step_mode: wgpu::VertexStepMode::Vertex,                                    //how often the pipeline should move to the next vertex
+            attributes: &[
+                wgpu::VertexAttribute {                                                 //define general attributes of the vertices, here it is just a plain 1 to 1 attribution
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                }
+            ]
+        }
+    }
+}
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -17,13 +53,17 @@ struct State {
     size: winit::dpi::PhysicalSize<u32>,
 
     render_pipeline: wgpu::RenderPipeline,  //The render pipeline is needed for drawing onto a surface, using shaders
+    vertex_buffer: wgpu::Buffer,
 
     bkcolor: wgpu::Color,
+    last_render: SystemTime,
 }
 
 impl State {
+
     // Creating some of the wgpu types requires async code
     async fn new(window: &Window) -> Self {
+
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -114,6 +154,15 @@ impl State {
         });
 
 
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(VERTICES),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let moment = SystemTime::now();
+
         Self {
             surface,
             device,
@@ -126,7 +175,9 @@ impl State {
                 b: 0.3,
                 a: 1.0,
             },
-            render_pipeline: render_pipeline
+            render_pipeline: render_pipeline,
+            vertex_buffer: vertex_buffer,
+            last_render: moment
         }
     }
      
@@ -165,6 +216,17 @@ impl State {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+
+        //check for performance, this is only loosely true, but might be enough for now.
+        //16.6ms are needed for 60fps (that is 16666 qs)
+        let now = SystemTime::now();
+
+        let time_passed_in_ms = self.last_render.elapsed().unwrap().as_micros();
+
+        println!("qs passed since last rendering: {}", time_passed_in_ms);
+        self.last_render = now;
+
+
 
         //get the frame to render to
         let output = self.surface.get_current_texture()?;
