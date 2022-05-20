@@ -279,16 +279,7 @@ pub(crate) async fn rendering_run(running: Arc<RwLock<bool>>, mut threads_vec: V
         
     event_loop.run(move |event, _, control_flow| match event {
         Event::RedrawRequested(window_id) if window_id == window.id() => {
-            state.update();
-            match state.render() {
-                Ok(_) => {}
-                // Reconfigure the surface if lost
-                Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
-                // The system is out of memory, we should probably quit
-                Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                // All other errors (Outdated, Timeout) should be resolved by the next frame
-                Err(e) => eprintln!("{:?}", e),
-            }
+            //we could trigger this Event by calling window.request_redraw(), for example in MainEventsCleared, but rendering right there is faster due to reduced function overhead
         }
         Event::WindowEvent {
             ref event,
@@ -323,10 +314,18 @@ pub(crate) async fn rendering_run(running: Arc<RwLock<bool>>, mut threads_vec: V
 
     }
     Event::MainEventsCleared => {
-        // RedrawRequested will only trigger once, unless we manually
-        // request it.
+
         //this event will be continuously submitted
-        window.request_redraw();
+        state.update();
+        match state.render() {
+            Ok(_) => {}
+            // Reconfigure the surface if lost
+            Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
+            // The system is out of memory, we should probably quit
+            Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+            // All other errors (Outdated, Timeout) should be resolved by the next frame
+            Err(e) => eprintln!("{:?}", e),
+        }
     }
         _ => {}
     });
