@@ -217,7 +217,7 @@ impl State {
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
 
-        //check for performance, this is only loosely true, but might be enough for now.
+        //check for performance, this is only loosely true, since these actions are not 0 cost, but might be enough for now.
         //16.6ms are needed for 60fps (that is 16666 qs)
         let now = SystemTime::now();
 
