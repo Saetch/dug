@@ -1,5 +1,5 @@
 use std::{sync::{RwLock, Arc}, thread::JoinHandle, time::SystemTime};
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{Pod, Zeroable, bytes_of};
 use rand::{thread_rng, Rng};
 use wgpu::{Features, include_wgsl, util::DeviceExt, Operations};
 use winit::{
@@ -161,7 +161,7 @@ impl State {
                 aspect: wgpu::TextureAspect::All,
             },
             // The actual pixel data
-            &diffuse_rgba,
+            diffuse_rgba.into_raw().as_slice(),
             // The layout of the texture
             wgpu::ImageDataLayout {
                 offset: 0,
@@ -396,11 +396,11 @@ impl State {
             depth_stencil_attachment: None,
         });
             // NEW!
-        render_pass.set_pipeline(&self.render_pipeline); // 2.
+         render_pass.set_pipeline(&self.render_pipeline); // 2.
         render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);   
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16); // 1.
-        render_pass.draw_indexed(0..self.num_indices, 0, 0..1); // 3.
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..1); // 3. 
         drop(render_pass);                     //this is needed, because in the previous step, the _render_pass object borrowed encoder mutably,
                                                 //  and thus we need to drop that borrow in order to use the encoder in the next step
 
