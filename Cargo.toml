@@ -10,9 +10,18 @@ rand = "0.8.5"
 winit = "0.26.1"
 env_logger = "0.9"
 bytemuck = { version = "1.9.1", features = ["derive"] }
+cgmath = "0.18"
+png = "0.17"
+serde = { version = "1.0", features = ["derive"] }
+ron = "0.7"
 log = "0.4"
-wgpu = "0.12"
+vulkano = { git = "https://github.com/vulkano-rs/vulkano" }
+vulkano-win = { git = "https://github.com/vulkano-rs/vulkano" }
+vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano" }
+
 pollster = "0.2.5"      #can poll stuff, wait for async returns in synchronous code
+
+
 
 [profile.release_opt]
 inherits = "release"
