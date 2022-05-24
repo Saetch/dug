@@ -17,7 +17,7 @@
 // what a vertex or a shader is.
 
 use bytemuck::{Pod, Zeroable};
-use std::{sync::{Arc, RwLock}, thread::JoinHandle};
+use std::{sync::{Arc, RwLock}, thread::JoinHandle, time::{SystemTime, Duration}};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
@@ -287,7 +287,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     }
     impl_vertex!(Vertex, position);
 
-    let vertices = [
+    let mut vertices = [
         Vertex {
             position: [-0.5, -0.25],
         },
@@ -298,7 +298,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             position: [0.25, -0.1],
         },
     ];
-    let vertex_buffer =
+    let mut vertex_buffer =
         CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
             .unwrap();
 
@@ -436,6 +436,9 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     // that, we store the submission of the previous frame here.
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
+
+    let mut last_change = SystemTime::now();
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -535,7 +538,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 let mut builder = AutoCommandBufferBuilder::primary(
                     device.clone(),
                     queue.family(),
-                    CommandBufferUsage::OneTimeSubmit,
+                    CommandBufferUsage::MultipleSubmit,
                 )
                 .unwrap();
 
@@ -600,10 +603,22 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                         previous_frame_end = Some(sync::now(device.clone()).boxed());
                     }
                     Err(e) => {
-                        println!("Failed to flush future: {:?}", e);
+                        println!("Failed to flush future: {:?}",    e);
                         previous_frame_end = Some(sync::now(device.clone()).boxed());
                     }
                 }
+            }
+            Event::MainEventsCleared => {
+                let now_time = SystemTime::now();
+                if (now_time.duration_since(last_change)).unwrap().as_millis() > 10 {
+                    last_change = SystemTime::now();
+                    println!("changing vertex positions");
+                    vertices.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
+                    println!("{:?}", vertices[0].position[1]);          //TODO: This should not be here, the vertex_buffer should be recreated when drawing, not when updating the logic
+                    vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
+                                    .unwrap();
+                }
+
             }
             _ => (),
         }
