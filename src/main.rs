@@ -1,15 +1,15 @@
-use std::{thread::{ spawn, sleep}, sync::{Arc, RwLock}, time::Duration};
-
+use std::{thread::{ spawn, sleep}, sync::{Arc, RwLock, atomic::AtomicBool}, time::Duration};
+use std::sync::atomic;
 use rendering::vulkano_render;
 mod rendering;
 fn main(){
     
-    let running = Arc::new(RwLock::new(true));
+    let running = Arc::new(AtomicBool::new(true));
 
     let idle_thread_running = running.clone();
 
     let idle_thread = spawn(move ||{
-        while *idle_thread_running.read().unwrap(){
+        while idle_thread_running.load(atomic::Ordering::Relaxed){
             
             println!("Idling! Later I'll be doing stuff for the game!");
             

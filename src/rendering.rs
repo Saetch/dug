@@ -17,7 +17,7 @@
 // what a vertex or a shader is.
 
 use bytemuck::{Pod, Zeroable};
-use std::{sync::{Arc, RwLock}, thread::JoinHandle, time::{SystemTime, Duration}};
+use std::{sync::{Arc, RwLock, atomic::AtomicBool}, thread::JoinHandle, time::{SystemTime, Duration}};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
@@ -51,7 +51,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<RwLock<bool>>) {
+pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>) {
 
     // instance
 
@@ -445,10 +445,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                let mut running_lock = running.write().unwrap();
-                *running_lock = false;
-                drop(running_lock);
-    
+
+                running.store(false, std::sync::atomic::Ordering::Relaxed);
                 while let Some(cur_thread) = threads_vec.pop() {
                     cur_thread.join().unwrap();
                 }
@@ -612,9 +610,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 let now_time = SystemTime::now();
                 if (now_time.duration_since(last_change)).unwrap().as_millis() > 10 {
                     last_change = SystemTime::now();
-                    println!("changing vertex positions");
                     vertices.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
-                    println!("{:?}", vertices[0].position[1]);          //TODO: This should not be here, the vertex_buffer should be recreated when drawing, not when updating the logic
+                    //TODO: This should not be here, the vertex_buffer should be recreated when drawing, not when updating the logic
                     vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
                                     .unwrap();
                 }
