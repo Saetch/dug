@@ -100,6 +100,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
         //create an EventLoop and a surface that correspons to it. Thus we will be able to handle events (changed sizes, mouse clicks, button pressed, refreshs, etc)
     let event_loop = EventLoop::new();
     let surface = WindowBuilder::new()          //abstraction of object that can be drawn to. Get the actual window by calling surface.window()
+        .with_title("Driven UnderGround!")
         .build_vk_surface(&event_loop, instance.clone())
         .unwrap();
 
@@ -816,6 +817,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 if (now_time.duration_since(last_change)).unwrap().as_millis() > 1 {
                     last_change = SystemTime::now();
                     vertices.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
+                    vertices.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
                     //TODO: This should not be here, the vertex_buffer should be recreated when drawing, not when updating the logic
                     vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
                                     .unwrap();
