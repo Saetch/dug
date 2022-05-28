@@ -284,18 +284,72 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
     struct Vertex {
         position: [f32; 2],
+        tex_i: u32,
+        coords: [f32; 2],
     }
-    impl_vertex!(Vertex, position);
+    impl_vertex!(Vertex, position, tex_i, coords);
 
+    //without tessellation, it is only possible to draw triangles. Thus we need to put 6 vertices per texture, when we want to draw a rectangle (2 triangles together)
     let mut vertices = [
         Vertex {
-            position: [-0.5, -0.25],
+            position: [-0.1, -0.9],
+            tex_i: 0,
+            coords: [1.0, 0.0],
         },
         Vertex {
-            position: [0.0, 0.5],
+            position: [-0.9, -0.9],
+            tex_i: 0,
+            coords: [0.0, 0.0],
         },
         Vertex {
-            position: [0.25, -0.1],
+            position: [-0.9, -0.1],
+            tex_i: 0,
+            coords: [0.0, 1.0],
+        },
+        Vertex {
+            position: [-0.1, -0.9],
+            tex_i: 0,
+            coords: [1.0, 0.0],
+        },
+        Vertex {
+            position: [-0.9, -0.1],
+            tex_i: 0,
+            coords: [0.0, 1.0],
+        },
+        Vertex {
+            position: [-0.1, -0.1],
+            tex_i: 0,
+            coords: [1.0, 1.0],
+        },
+        Vertex {
+            position: [0.9, -0.9],
+            tex_i: 1,
+            coords: [1.0, 0.0],
+        },
+        Vertex {
+            position: [0.1, -0.9],
+            tex_i: 1,
+            coords: [0.0, 0.0],
+        },
+        Vertex {
+            position: [0.1, -0.1],
+            tex_i: 1,
+            coords: [0.0, 1.0],
+        },
+        Vertex {
+            position: [0.9, -0.9],
+            tex_i: 1,
+            coords: [1.0, 0.0],
+        },
+        Vertex {
+            position: [0.1, -0.1],
+            tex_i: 1,
+            coords: [0.0, 1.0],
+        },
+        Vertex {
+            position: [0.9, -0.1],
+            tex_i: 1,
+            coords: [1.0, 1.0],
         },
     ];
     let mut vertex_buffer =
@@ -310,6 +364,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     // `vulkano-shaders` crate docs. You can view them at https://docs.rs/vulkano-shaders/
     //
     // TODO: explain this in details
+
+    //the vec4(position, 0.0, 1.0) puts the vertex at the specified index, while zooming out by a factor of 1. Changing the 1.0 will zoom inwards or outwards
     mod vs {
         vulkano_shaders::shader! {
             ty: "vertex",
