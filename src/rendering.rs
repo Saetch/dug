@@ -652,12 +652,14 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             }
             Event::RedrawEventsCleared => {
 
+
                 // Do not draw frame when screen dimensions are zero.
                 // On Windows, this can occur from minimizing the application.
                 let dimensions = surface.window().inner_size();
                 if dimensions.width == 0 || dimensions.height == 0 {
                     return;
                 }
+
 
                 // It is important to call this function from time to time, otherwise resources will keep
                 // accumulating and you will eventually reach an out of memory error.
@@ -805,9 +807,12 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     }
                 }
             }
-            //this Event gets submitted 60 times per second
+            //this Event gets submitted 60 times per second, due to vulkan restricting rendering to once per ~16.4-16.5 ms.
+            //this can be called way more if running on a different thread and thus (and because of hardware limitations aswell),
+            //it is needed, to update game-logic with delta-time
             Event::MainEventsCleared => {
                 let now_time = SystemTime::now();
+                println!("{:?}", now_time.duration_since(last_change));
                 if (now_time.duration_since(last_change)).unwrap().as_millis() > 1 {
                     last_change = SystemTime::now();
                     vertices.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
