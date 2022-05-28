@@ -284,7 +284,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     }
     impl_vertex!(Vertex, position, tex_i, coords);
 
-    //without tessellation, it is only possible to draw triangles. Thus we need to put 6 vertices per texture, when we want to draw a rectangle (2 triangles together)
+    //to draw triangles. Thus we need to put 6 vertices per texture, when we want to draw a rectangle (2 triangles together)
     let mut vertices = [
         Vertex {                        //Vertices need to be drawn counter-clockwise in order for them to make sense
             position: [-0.1, -0.9],     //these are the coordinates on the screen for this vertex. The screen coordinates go from -1.0 (LEFT) to 1.0 (RIGHT) AND from -1.0 (UP) to 1.0 (DOWN)
