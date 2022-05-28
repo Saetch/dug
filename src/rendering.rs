@@ -402,7 +402,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
 
     let dwarf_Base_house_texture = {
-        let png_bytes = include_bytes!("../Dwarf_BaseHouse.png").to_vec();
+        let png_bytes = include_bytes!("../Dwarf_BaseHouse_px9.png").to_vec();
         let cursor = Cursor::new(png_bytes);
         let decoder = png::Decoder::new(cursor);
         let mut reader = decoder.read_info().unwrap();
