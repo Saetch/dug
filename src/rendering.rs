@@ -1,48 +1,42 @@
-// Copyright (c) 2016 The vulkano developers
-// Licensed under the Apache License, Version 2.0
-// <LICENSE-APACHE or
-// https://www.apache.org/licenses/LICENSE-2.0> or the MIT
-// license <LICENSE-MIT or https://opensource.org/licenses/MIT>,
-// at your option. All files in the project carrying such
-// notice may not be copied, modified, or distributed except
-// according to those terms.
-
-// Welcome to the triangle example!
-//
-// This is the only example that is entirely detailed. All the other examples avoid code
-// duplication by using helper functions.
-//
-// This example assumes that you are already more or less familiar with graphics programming
-// and that you want to learn Vulkan. This means that for example it won't go into details about
-// what a vertex or a shader is.
-
 use bytemuck::{Pod, Zeroable};
-use std::{sync::{Arc, RwLock, atomic::AtomicBool}, thread::JoinHandle, time::{SystemTime, Duration}, io::Cursor};
+use std::{io::Cursor, sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
     },
+    descriptor_set::{
+        layout::{
+            DescriptorSetLayout, DescriptorSetLayoutCreateInfo, DescriptorSetLayoutCreationError,
+        },
+        PersistentDescriptorSet, WriteDescriptorSet,
+    },
     device::{
         physical::{PhysicalDevice, PhysicalDeviceType},
-        Device, DeviceCreateInfo, DeviceExtensions, QueueCreateInfo, Features,
+        Device, DeviceCreateInfo, DeviceExtensions, Features, QueueCreateInfo,
     },
-    image::{view::ImageView, ImageAccess, ImageUsage, SwapchainImage, ImageDimensions, ImmutableImage, MipmapsCount},
+    format::Format,
+    image::{
+        view::ImageView, ImageAccess, ImageDimensions, ImageUsage, ImmutableImage, MipmapsCount,
+        SwapchainImage,
+    },
     impl_vertex,
     instance::{Instance, InstanceCreateInfo},
     pipeline::{
         graphics::{
-            input_assembly::InputAssemblyState,
+            color_blend::ColorBlendState,
             vertex_input::BuffersDefinition,
-            viewport::{Viewport, ViewportState}, color_blend::ColorBlendState,
+            viewport::{Viewport, ViewportState},
         },
-        GraphicsPipeline, layout::PipelineLayoutCreateInfo, PipelineLayout, Pipeline, PipelineBindPoint,
+        layout::PipelineLayoutCreateInfo,
+        GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
     },
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
+    sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
     swapchain::{
         acquire_next_image, AcquireError, Swapchain, SwapchainCreateInfo, SwapchainCreationError,
     },
-    sync::{self, FlushError, GpuFuture}, format::Format, sampler::{Sampler, SamplerCreateInfo, SamplerAddressMode, Filter}, descriptor_set::{layout::{DescriptorSetLayoutCreateInfo, DescriptorSetLayout, DescriptorSetLayoutCreationError}, PersistentDescriptorSet, WriteDescriptorSet},
+    sync::{self, FlushError, GpuFuture},
 };
 use vulkano_win::VkSurfaceBuild;
 use winit::{
@@ -450,69 +444,13 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
 
 
-    let mascot_texture = {
-        let png_bytes = include_bytes!("rust_mascot.png").to_vec();
-        let cursor = Cursor::new(png_bytes);
-        let decoder = png::Decoder::new(cursor);
-        let mut reader = decoder.read_info().unwrap();
-        let info = reader.info();
-        let dimensions = ImageDimensions::Dim2d {
-            width: info.width,
-            height: info.height,
-            array_layers: 1,
-        };
-        let mut image_data = Vec::new();
-        image_data.resize((info.width * info.height * 4) as usize, 0);
-        reader.next_frame(&mut image_data).unwrap();
-
-        let image = ImmutableImage::from_iter(
-            image_data,
-            dimensions,
-            MipmapsCount::One,
-            Format::R8G8B8A8_SRGB,
-            queue.clone(),
-        )
-        .unwrap()
-        .0;
-
-        ImageView::new_default(image).unwrap()
-    };
-
-    let vulkano_texture = {
-        let png_bytes = include_bytes!("vulkano_logo.png").to_vec();
-        let cursor = Cursor::new(png_bytes);
-        let decoder = png::Decoder::new(cursor);
-        let mut reader = decoder.read_info().unwrap();
-        let info = reader.info();
-        let dimensions = ImageDimensions::Dim2d {
-            width: info.width,
-            height: info.height,
-            array_layers: 1,
-        };
-        let mut image_data = Vec::new();
-        image_data.resize((info.width * info.height * 4) as usize, 0);
-        reader.next_frame(&mut image_data).unwrap();
-
-        let image = ImmutableImage::from_iter(
-            image_data,
-            dimensions,
-            MipmapsCount::One,
-            Format::R8G8B8A8_SRGB,
-            queue.clone(),
-        )
-        .unwrap()
-        .0;
-
-        ImageView::new_default(image).unwrap()
-    };
 
 
 
 
 
 
-
-    let Dwarf_Base_house_texture = {
+    let dwarf_Base_house_texture = {
         let png_bytes = include_bytes!("../Dwarf_BaseHouse.png").to_vec();
         let cursor = Cursor::new(png_bytes);
         let decoder = png::Decoder::new(cursor);
@@ -632,30 +570,25 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
         .fragment_shader(fs.entry_point("main").unwrap(), ())
         .color_blend_state(ColorBlendState::new(subpass.num_color_attachments()).blend_alpha())
         .render_pass(subpass)
-        // Now that our builder is filled, we call `build()` to obtain an actual pipeline.
-        .build(device.clone())
+        .with_pipeline_layout(device.clone(), pipeline_layout)
         .unwrap();
 
     let layout = pipeline.layout().set_layouts().get(0).unwrap();
 
-    let descriptors = [
-        (vulkano_texture.clone() as _, sampler.clone()),
-        (mascot_texture.clone() as _, sampler.clone()),
+
+    let descriptor_array = [
+        (dwarf_Base_house_texture.clone() as _, sampler.clone()),
+        (rust_logo_texture.clone() as _, sampler.clone()),
     ];
 
-    let descriptor_array = [WriteDescriptorSet::image_view_sampler_array(
-        0,
-        0,
-        descriptors
-        ,
-    )];
-
-    //descriptor sets explain to a render pass what objects are accessible
     let descriptor_set = PersistentDescriptorSet::new_variable(
         layout.clone(),
         2,
-        descriptor_array
-        ,
+        [WriteDescriptorSet::image_view_sampler_array(
+            0,
+            0,
+            descriptor_array,
+        )],
     )
     .unwrap();
 
@@ -718,6 +651,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
+
                 // Do not draw frame when screen dimensions are zero.
                 // On Windows, this can occur from minimizing the application.
                 let dimensions = surface.window().inner_size();
@@ -871,9 +805,10 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     }
                 }
             }
+            //this Event gets submitted 60 times per second
             Event::MainEventsCleared => {
                 let now_time = SystemTime::now();
-                if (now_time.duration_since(last_change)).unwrap().as_millis() > 10 && false {
+                if (now_time.duration_since(last_change)).unwrap().as_millis() > 1 {
                     last_change = SystemTime::now();
                     vertices.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
                     //TODO: This should not be here, the vertex_buffer should be recreated when drawing, not when updating the logic
