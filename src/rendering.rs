@@ -351,57 +351,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
         CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
             .unwrap();
 
-    // The next step is to create the shaders.
-    //
-    // The raw shader creation API provided by the vulkano library is unsafe, for various reasons.
-    //
-    // An overview of what the `shader!` macro generates can be found in the
-    // `vulkano-shaders` crate docs. You can view them at https://docs.rs/vulkano-shaders/
-    //
-    // TODO: explain this in details
 
-    //the vec4(position, 0.0, 1.0) puts the vertex at the specified index, while zooming out by a factor of 1. Changing the 1.0 will zoom inwards or outwards
-    mod vs {
-        vulkano_shaders::shader! {
-            ty: "vertex",
-            src: "
-            #version 450
-            
-            layout(location = 0) in vec2 position;
-            layout(location = 1) in uint tex_i;
-            layout(location = 2) in vec2 coords;
-            
-            layout(location = 0) out flat uint out_tex_i;
-            layout(location = 1) out vec2 out_coords;
-            
-            void main() {
-                gl_Position = vec4(position, 0.0, 1.0);
-                out_tex_i = tex_i;
-                out_coords = coords;
-            }"
-        }
-    }
-
-    mod fs {
-        vulkano_shaders::shader! {
-            ty: "fragment",
-            src: "
-            #version 450
-            
-            #extension GL_EXT_nonuniform_qualifier : enable
-            
-            layout(location = 0) in flat uint tex_i;
-            layout(location = 1) in vec2 coords;
-            
-            layout(location = 0) out vec4 f_color;
-            
-            layout(set = 0, binding = 0) uniform sampler2D tex[];
-            
-            void main() {
-                f_color = texture(tex[tex_i], coords);
-            }"
-        }
-    }
 
     let vs = vs::load(device.clone()).unwrap();
     let fs = fs::load(device.clone()).unwrap();
@@ -853,3 +803,56 @@ fn window_size_dependent_setup(
         })
         .collect::<Vec<_>>()
 }
+
+
+
+    //
+    // The raw shader creation API provided by the vulkano library is unsafe, for various reasons.
+    //
+    // An overview of what the `shader!` macro generates can be found in the
+    // `vulkano-shaders` crate docs. You can view them at https://docs.rs/vulkano-shaders/
+    //
+    // TODO: explain this in details
+
+    //the vec4(position, 0.0, 1.0) puts the vertex at the specified index, while zooming out by a factor of 1. Changing the 1.0 will zoom inwards or outwards
+    mod vs {
+        vulkano_shaders::shader! {
+            ty: "vertex",
+            src: "
+            #version 450
+            
+            layout(location = 0) in vec2 position;
+            layout(location = 1) in uint tex_i;
+            layout(location = 2) in vec2 coords;
+            
+            layout(location = 0) out flat uint out_tex_i;
+            layout(location = 1) out vec2 out_coords;
+            
+            void main() {
+                gl_Position = vec4(position, 0.0, 1.0);
+                out_tex_i = tex_i;
+                out_coords = coords;
+            }"
+        }
+    }
+
+    mod fs {
+        vulkano_shaders::shader! {
+            ty: "fragment",
+            src: "
+            #version 450
+            
+            #extension GL_EXT_nonuniform_qualifier : enable
+            
+            layout(location = 0) in flat uint tex_i;
+            layout(location = 1) in vec2 coords;
+            
+            layout(location = 0) out vec4 f_color;
+            
+            layout(set = 0, binding = 0) uniform sampler2D tex[];
+            
+            void main() {
+                f_color = texture(tex[tex_i], coords);
+            }"
+        }
+    }
