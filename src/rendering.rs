@@ -463,7 +463,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
         SamplerCreateInfo {
             mag_filter: Filter::Linear,
             min_filter: Filter::Linear,
-            address_mode: [SamplerAddressMode::Repeat; 3],
+            address_mode: [SamplerAddressMode::Repeat; 3],  //this will determine what happens when the sampler is supposed to get the color of a pixel outside the image. Repeat: act as if the image repeats endlessly, thus get the color of the next hypothetical image. 
             ..Default::default()
         },
     )
@@ -806,7 +806,7 @@ fn window_size_dependent_setup(
 
 
 
-    //
+
     // The raw shader creation API provided by the vulkano library is unsafe, for various reasons.
     //
     // An overview of what the `shader!` macro generates can be found in the
