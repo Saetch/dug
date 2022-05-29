@@ -28,7 +28,7 @@ use winit::{
 };
 use crate::rendering::renderer_init::*;
 
-pub fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>) {
+pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>) {
     
     
     let (device, queue, pipeline, images, render_pass, event_loop
