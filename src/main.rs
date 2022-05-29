@@ -1,6 +1,6 @@
-use std::{thread::{ spawn, sleep}, sync::{Arc, RwLock, atomic::AtomicBool}, time::Duration};
+use std::{thread::{ spawn, sleep}, sync::{Arc,  atomic::AtomicBool}, time::Duration};
 use std::sync::atomic;
-use rendering::vulkano_render;
+use crate::rendering::renderer::vulkano_render;
 mod rendering;
 fn main(){
     
