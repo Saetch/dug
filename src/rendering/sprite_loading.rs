@@ -4,7 +4,7 @@ use vulkano::{pipeline::{GraphicsPipeline, PipelineLayout, layout::PipelineLayou
 
 use super::renderer::Vertex;
 
-
+//SEE vulkano examples -> image-self-copy-blit for an example on how to use StorageImages, to store imageInfo and on how to use ImageCopies in render passes
 
 pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, vs: Arc<ShaderModule>, fs: Arc<ShaderModule>)-> (Arc<GraphicsPipeline>, Arc<PersistentDescriptorSet>){
     let dwarf_base_house_texture = {

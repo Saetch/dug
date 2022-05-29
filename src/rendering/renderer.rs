@@ -3,7 +3,7 @@ use std::{sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime}
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
+        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents, ClearColorImageInfo,
     },
     image::{
         view::ImageView, ImageAccess,
