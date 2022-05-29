@@ -28,6 +28,22 @@ use winit::{
 };
 use crate::rendering::renderer_init::*;
 
+
+    // To create a buffer that will store the shape of our triangle.
+    // We use #[repr(C)] here to force rustc to not do anything funky with our data, although for this
+    // particular example, it doesn't actually change the in-memory representation. This can be understood as represent this data as it would be in C Code
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
+    pub(crate) struct Vertex {
+        pub(crate) position: [f32; 2],
+        pub(crate) tex_i: u32,
+        pub(crate) coords: [f32; 2],
+    }
+
+
+
+    
+
 pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>) {
     
     
@@ -352,15 +368,6 @@ fn window_size_dependent_setup(
     }
 
 
-    // To create a buffer that will store the shape of our triangle.
-    // We use #[repr(C)] here to force rustc to not do anything funky with our data, although for this
-    // particular example, it doesn't actually change the in-memory representation. This can be understood as represent this data as it would be in C Code
-    #[repr(C)]
-    #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
-    pub(crate) struct Vertex {
-        pub(crate) position: [f32; 2],
-        pub(crate) tex_i: u32,
-        pub(crate) coords: [f32; 2],
-    }
+
 
 
