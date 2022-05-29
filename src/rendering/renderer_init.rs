@@ -1,7 +1,7 @@
 
 use std::{io::Cursor, sync::{Arc}};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
+    buffer::{BufferUsage, CpuAccessibleBuffer},
     descriptor_set::{
         layout::{
             DescriptorSetLayout, DescriptorSetLayoutCreateInfo, DescriptorSetLayoutCreationError,
