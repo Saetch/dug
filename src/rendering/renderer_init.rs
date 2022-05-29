@@ -1,10 +1,7 @@
-use bytemuck::{Pod, Zeroable};
-use std::{io::Cursor, sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime};
+
+use std::{io::Cursor, sync::{Arc}};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
-    },
     descriptor_set::{
         layout::{
             DescriptorSetLayout, DescriptorSetLayoutCreateInfo, DescriptorSetLayoutCreationError,

@@ -1,48 +1,30 @@
 use bytemuck::{Pod, Zeroable};
-use std::{io::Cursor, sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime};
+use std::{sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
     },
-    descriptor_set::{
-        layout::{
-            DescriptorSetLayout, DescriptorSetLayoutCreateInfo, DescriptorSetLayoutCreationError,
-        },
-        PersistentDescriptorSet, WriteDescriptorSet,
-    },
-    device::{
-        physical::{PhysicalDevice, PhysicalDeviceType},
-        Device, DeviceCreateInfo, DeviceExtensions, Features, QueueCreateInfo, Queue,
-    },
-    format::Format,
     image::{
-        view::ImageView, ImageAccess, ImageDimensions, ImageUsage, ImmutableImage, MipmapsCount,
+        view::ImageView, ImageAccess,
         SwapchainImage,
     },
-    impl_vertex,
-    instance::{Instance, InstanceCreateInfo},
     pipeline::{
         graphics::{
-            color_blend::ColorBlendState,
-            vertex_input::BuffersDefinition,
-            viewport::{Viewport, ViewportState},
-        },
-        layout::PipelineLayoutCreateInfo,
-        GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
+            viewport::{Viewport},
+        }, Pipeline, PipelineBindPoint,
     },
-    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
-    sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
+    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass},
     swapchain::{
-        acquire_next_image, AcquireError, Swapchain, SwapchainCreateInfo, SwapchainCreationError, Surface,
+        acquire_next_image, AcquireError, SwapchainCreateInfo, SwapchainCreationError,
     },
     sync::{self, FlushError, GpuFuture},
 };
-use vulkano_win::VkSurfaceBuild;
+
 use winit::{
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
+    event_loop::{ControlFlow},
+    window::{Window},
 };
 use crate::rendering::renderer_init::*;
 
