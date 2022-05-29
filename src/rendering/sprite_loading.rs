@@ -1,10 +1,12 @@
-use std::sync::Arc;
+use std::{sync::Arc, io::Cursor};
 
-use vulkano::{pipeline::GraphicsPipeline, descriptor_set::{PersistentDescriptorSet, self}};
+use vulkano::{pipeline::{GraphicsPipeline, PipelineLayout, layout::PipelineLayoutCreateInfo, graphics::{vertex_input::BuffersDefinition, viewport::ViewportState, color_blend::ColorBlendState}, Pipeline}, descriptor_set::{PersistentDescriptorSet, layout::{DescriptorSetLayoutCreateInfo, DescriptorSetLayout, DescriptorSetLayoutCreationError}, WriteDescriptorSet}, image::{ImageDimensions, ImmutableImage, MipmapsCount, view::ImageView}, format::Format, sampler::{Sampler, SamplerCreateInfo, Filter, SamplerAddressMode}, render_pass::{Subpass, self, RenderPass}, device::{Queue, Device}, shader::ShaderModule};
+
+use super::renderer::Vertex;
 
 
 
-pub(crate) fn load_sprites()-> (Arc<GraphicsPipeline>, Arc<PersistentDescriptorSet>){
+pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, vs: Arc<ShaderModule>, fs: Arc<ShaderModule>)-> (Arc<GraphicsPipeline>, Arc<PersistentDescriptorSet>){
     let dwarf_base_house_texture = {
         let png_bytes = include_bytes!("../../Dwarf_BaseHouse_px9.png").to_vec();
         let cursor = Cursor::new(png_bytes);
