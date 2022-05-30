@@ -1,15 +1,36 @@
-use std::{thread::{ spawn, sleep}, sync::{Arc,  atomic::AtomicBool}, time::Duration};
+use std::{thread::{ spawn, sleep, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool}, time::Duration};
 use std::sync::atomic;
-use crate::view::renderer::vulkano_render;
+use controller::controller_input::ControllerInput;
+
+use crate::{view::renderer::vulkano_render, controller::controller::handle_input};
+mod controller;
 mod view;
 fn main(){
     
+
+
+    let (threads_vec,
+        controller_sender,
+         running)
+          = start_threads();
+    //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
+    //otherwise it will lead to cross-platform compatibility problems
+    vulkano_render(threads_vec, running, controller_sender);
+}
+
+
+fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<AtomicBool>){
+
+
+
+    let (sender, receiver) = flume::unbounded::<ControllerInput>();
+
     let running = Arc::new(AtomicBool::new(true));
 
-    let idle_thread_running = running.clone();
+    let thread_running = running.clone();
 
-    let idle_thread = spawn(move ||{
-        while idle_thread_running.load(atomic::Ordering::Relaxed){
+    let model_thread = spawn(move ||{
+        while thread_running.load(atomic::Ordering::Relaxed){
             
             println!("Idling! Later I'll be doing stuff for the game!");
             
@@ -19,8 +40,28 @@ fn main(){
         println!("Oh no! I'm getting terminated! Brhsshh!");
     });
 
-    let threads_vec = vec![idle_thread];
-    //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
-    //otherwise it will lead to cross-platform compatibility problems
-    vulkano_render(threads_vec, running);
+    let thread_running = running.clone();
+
+    let controller_thread = thread::spawn(move ||{
+        while thread_running.load(atomic::Ordering::Relaxed){
+            let inp = receiver.recv();
+            if let Ok(input) = inp{
+                handle_input(input);
+            }else {
+                if thread_running.load(atomic::Ordering::SeqCst){
+                    println!("Could not receive input message from rendering thread!");
+
+                }else{
+                    println!("Gracefully stopping the controller thread" );
+
+                }
+                break;
+            }
+            
+        }
+        println!("Oh no! I'm getting terminated! Brhsshh!");
+    });
+
+
+    return (vec![model_thread, controller_thread], sender, running);
 }

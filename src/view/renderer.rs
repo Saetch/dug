@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use flume::{Sender, SendError};
 use rand::Rng;
 use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
@@ -23,11 +24,11 @@ use vulkano::{
 };
 
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, WindowEvent, MouseButton, VirtualKeyCode},
     event_loop::{ControlFlow},
     window::{Window},
 };
-use crate::view::renderer_init::*;
+use crate::{view::renderer_init::*, controller::controller_input::{ControllerInput, MouseInputType}};
 
 
     // To create a buffer that will store the shape of our triangle.
@@ -45,9 +46,9 @@ use crate::view::renderer_init::*;
 
     
 
-pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>) {
+pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>) {
     
-    
+    let mut ctr_sender = Some(controller_s);
     let (device, queue, pipeline, images, render_pass, event_loop
     , surface,mut swapchain, descriptor_set)
      = init();
@@ -95,24 +96,85 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     let vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
 
 
+    //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-
-                running.store(false, std::sync::atomic::Ordering::Relaxed);
+                
+                running.store(false, std::sync::atomic::Ordering::SeqCst);
+                //dropping the sender will result in an Err Result on the controller thread recv() method
+                ctr_sender = None;
                 while let Some(cur_thread) = threads_vec.pop() {
                     cur_thread.join().unwrap();
                 }
                 *control_flow = ControlFlow::Exit;
+
+
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 ..
             } => {
                 recreate_swapchain = true;
+            }
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput { device_id: _ , input, is_synthetic: _ },
+                ..
+            } => {
+                //these if let statements are needed, since the ctr_sender is an option, meaning it can be dropped at runtime
+                //this dropping is used in order to stop the controller thread. (SEE above: ctr_sender = None;) This might not be strictly MVC here, but it saves a lot of overhead, since the Window has to be managed by the view here
+                if let Some(controller_sender) = ctr_sender.clone(){
+                    controller_sender.send(ControllerInput::KeyboardInput { key: input.virtual_keycode, state : input.state }).expect("Could not send keyboard input details to controller thread!");
+                }
+            }
+            Event::WindowEvent {
+                event: WindowEvent::MouseInput { device_id: _, state , button: btn, .. },
+                ..
+            } => {
+                if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send(ControllerInput::MouseInput { action: MouseInputType::Click { button: btn, state: state } }).expect("Could not send mouse click input details to controller thread!");
+                }
+            }
+            Event::WindowEvent { 
+                 event: WindowEvent::CursorLeft { device_id: _ },
+                 ..
+                } 
+                => {
+                    if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::LeftWindow }).expect("Could not send cursor left info to controller thread");
+                }   
+            }
+            Event::WindowEvent {  
+                event: WindowEvent::CursorEntered { device_id: _ } ,
+            ..
+            } => {
+                if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::EnteredWindow }).expect("Could not send cursor entered info to controller thread");
+                }
+            }
+            Event::WindowEvent {  
+                event: WindowEvent::CursorMoved { device_id: _, position, .. },
+            ..
+            } => {
+                if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Move(position.x, position.y) }).expect("Could not send mouse moved input details to controller thread");
+                }
+            }
+            Event::WindowEvent {
+                 event: WindowEvent::MouseWheel { device_id: _, delta, phase , ..},
+                .. 
+            } => {
+                if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Scroll { delta, phase } }).expect("Could not send mouse wheel input details to controller thread");
+                }
             }
             Event::RedrawEventsCleared => {
 
@@ -281,6 +343,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             //this can be called way more if running on a different thread and thus (and because of hardware limitations aswell),
             //it is needed, to update game-logic with delta-time
             Event::MainEventsCleared => {
+
                 
                 
                 let now_time = SystemTime::now();
