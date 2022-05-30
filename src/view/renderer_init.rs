@@ -28,7 +28,7 @@ use winit::{
     window::{Window, WindowBuilder}, event_loop::EventLoop,
 };
 use crate::view::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites};
-pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>, [Vertex; 12]){
+pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>){
     // instance
 
 // surface
@@ -256,7 +256,7 @@ let (swapchain, images) = {
 
 
 impl_vertex!(Vertex, position, tex_i, coords);
-
+/* These used to be the initial 2 pictures that were represented. This is only here to show how to create some vertices that represent a texture on screen
 //to draw triangles. Thus we need to put 6 vertices per texture, when we want to draw a rectangle (2 triangles together)
 let vertices = [
     Vertex {                        //Vertices need to be drawn counter-clockwise in order for them to make sense
@@ -320,9 +320,8 @@ let vertices = [
         coords: [1.0, 1.0],
     },
 ];
-let vec = vertices.to_vec();
 
-
+*/
 
 
 let vs = vs::load(device.clone()).unwrap();
@@ -376,5 +375,5 @@ let render_pass = vulkano::single_pass_renderpass!(
 let (pipeline, descriptor_set) = load_sprites(device.clone(), queue.clone(), render_pass.clone(), vs.clone(), fs.clone());
 
 
-return (device, queue, pipeline, images, render_pass, event_loopi, surface,  swapchain, descriptor_set, vertices)
+return (device, queue, pipeline, images, render_pass, event_loopi, surface,  swapchain, descriptor_set)
 }

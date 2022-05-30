@@ -49,7 +49,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     
     
     let (device, queue, pipeline, images, render_pass, event_loop
-    , surface,mut swapchain, descriptor_set,vertices_array)
+    , surface,mut swapchain, descriptor_set)
      = init();
     
 
@@ -92,8 +92,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
     let mut last_change = SystemTime::now();
     let mut last_image_added = SystemTime::now();
-    let vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(vertices_array.to_vec()));
-    drop(vertices_array);
+    let vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
+
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -215,7 +215,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                             //
                             // Only attachments that have `LoadOp::Clear` are provided with clear
                             // values, any others should use `ClearValue::None` as the clear value.
-                            clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into())],
+                            clear_values: vec![Some([0.4, 0.4, 0.4, 1.0].into())],
                             ..RenderPassBeginInfo::framebuffer(framebuffers[image_num].clone())
                         },
                         // The contents of the first (and only) subpass. This can be either
@@ -282,38 +282,47 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             //it is needed, to update game-logic with delta-time
             Event::MainEventsCleared => {
                 
-                if true{
+                
                     let now_time = SystemTime::now();
-                    println!("{:?}", now_time.duration_since(last_change));
+                    let time_diff = now_time.duration_since(last_change);
                     last_change = SystemTime::now();
+
+                    println!("{:?}", time_diff);
+                    for _ in 0..20000 {      //THIS IS JUST SOME JUNK TO SIMULATE SOME ACTUAL LOGIC TO GET THE CORRECT VERTICES
+                        let k = 0;
+                        let m = k+2;
+                        let s = String::from(m.to_string());
+                        assert!(m == s.parse::<i32>().unwrap());
+                    }
 
 
                     let mut  vertices_lock = vertices.write().unwrap();
-
-                    *vertices_lock = Vec::new();
-                    let max = 5000;
-                    for i in 0..max{
-                        let close_f = -0.1;
-                        let far_f = -0.9;
-                        let mut i2 = i as f32;
-                        while i2 > max as f32 /10.0 {
-                            i2 -=max as f32 /10.0;
+                    if vertices_lock.len() < 100{
+                        *vertices_lock = Vec::new();
+                        let max = 5000;
+                        for i in 0..max{
+                            let close_f = -0.1;
+                            let far_f = -0.9;
+                            let mut i2 = i as f32;
+                            while i2 > max as f32 /10.0 {
+                                i2 -=max as f32 /10.0;
+                            }
+                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) +far_f], tex_i: 0, coords: [1.0, 0.0] });
+                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + far_f], tex_i: 0, coords: [0.0, 0.0] });
+                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
+                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) + far_f], tex_i: 0, coords: [1.0, 0.0] });
+                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
+                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [1.0, 1.0] });
+    
                         }
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) +far_f], tex_i: 0, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + far_f], tex_i: 0, coords: [0.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) + far_f], tex_i: 0, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [1.0, 1.0] });
-
                     }
-                }else{
+
+                
+
                     let mut rng = rand::thread_rng();
-                    let now_time = SystemTime::now();
-                    println!("{:?}", now_time.duration_since(last_change));
-                    if (now_time.duration_since(last_change)).unwrap().as_millis() > 15 {
+                    //This puts even more strain on the current thread, later this should be handled by the model thread
+                    if  time_diff.unwrap().as_millis() > 15 {
                         last_change = SystemTime::now();
-                        let mut vertices_lock = vertices.write().expect("Could not write to vertex-Vector");
                         
                         vertices_lock.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
                         vertices_lock.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
@@ -322,7 +331,6 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     
                     if (now_time.duration_since(last_image_added)).unwrap().as_millis() > 7000 {
                         last_image_added = SystemTime::now();
-                        let mut vertices_lock = vertices.write().expect("Could not write to vertices-vector");
                         let index = rng.gen::<u32>() % 2;
                         let sign = rng.gen_range(0.0..1.0);
     
@@ -336,8 +344,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                         vertices_lock.push(Vertex { position: [sign+close_f, close_f], tex_i: index, coords: [1.0, 1.0] });
     
                     }
-                }
-
+               
+                    
 
 
 
