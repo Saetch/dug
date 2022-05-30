@@ -49,7 +49,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     
     
     let (device, queue, pipeline, images, render_pass, event_loop
-    , surface,mut swapchain, descriptor_set,mut vertex_buffer,vertices_array)
+    , surface,mut swapchain, descriptor_set,vertices_array)
      = init();
     
 
@@ -162,7 +162,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 
 
                 //safe the current state in the vertex_buffer for drawing
-                vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.read().unwrap().clone())
+                let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.read().unwrap().clone())
                 .unwrap();
 
                 // Before we can draw on the output, we have to *acquire* an image from the swapchain. If

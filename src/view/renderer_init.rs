@@ -28,7 +28,7 @@ use winit::{
     window::{Window, WindowBuilder}, event_loop::EventLoop,
 };
 use crate::view::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites};
-pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>, Arc<CpuAccessibleBuffer<[Vertex]>>, [Vertex; 12]){
+pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>, [Vertex; 12]){
     // instance
 
 // surface
@@ -321,9 +321,7 @@ let vertices = [
     },
 ];
 let vec = vertices.to_vec();
-let vertex_buffer =
-    CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::vertex_buffer(), false, vec)
-        .unwrap();
+
 
 
 
@@ -378,5 +376,5 @@ let render_pass = vulkano::single_pass_renderpass!(
 let (pipeline, descriptor_set) = load_sprites(device.clone(), queue.clone(), render_pass.clone(), vs.clone(), fs.clone());
 
 
-return (device, queue, pipeline, images, render_pass, event_loopi, surface,  swapchain, descriptor_set, vertex_buffer, vertices)
+return (device, queue, pipeline, images, render_pass, event_loopi, surface,  swapchain, descriptor_set, vertices)
 }
