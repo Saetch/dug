@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use std::{sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
+    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess, BufferContents},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
     },
@@ -48,7 +48,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     
     
     let (device, queue, pipeline, images, render_pass, event_loop
-    , surface,mut swapchain, descriptor_set,mut vertex_buffer,mut vertices)
+    , surface,mut swapchain, descriptor_set,mut vertex_buffer,mut vertices_array)
      = init();
     
 
@@ -91,6 +91,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
     let mut last_change = SystemTime::now();
 
+    let mut vertices :Vec<Vertex> = vertices_array.to_vec();
+    drop(vertices_array);
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -155,9 +157,10 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     recreate_swapchain = false;
                 }
 
+                
 
                 //safe the current state in the vertex_buffer for drawing
-                vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
+                vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.clone())
                 .unwrap();
 
                 // Before we can draw on the output, we have to *acquire* an image from the swapchain. If

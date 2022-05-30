@@ -1,5 +1,5 @@
 
-use std::{sync::{Arc}};
+use std::{sync::{Arc}, array};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     descriptor_set::{
@@ -320,8 +320,9 @@ let vertices = [
         coords: [1.0, 1.0],
     },
 ];
+let vec = vertices.to_vec();
 let vertex_buffer =
-    CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
+    CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::vertex_buffer(), false, vec)
         .unwrap();
 
 
