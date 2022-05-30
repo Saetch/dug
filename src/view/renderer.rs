@@ -283,67 +283,67 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             Event::MainEventsCleared => {
                 
                 
-                    let now_time = SystemTime::now();
-                    let time_diff = now_time.duration_since(last_change);
-                    last_change = SystemTime::now();
+                let now_time = SystemTime::now();
+                let time_diff = now_time.duration_since(last_change);
+                last_change = SystemTime::now();
 
-                    println!("{:?}", time_diff);
-                    for _ in 0..15000 {      //THIS IS JUST SOME JUNK TO SIMULATE SOME ACTUAL LOGIC TO GET THE CORRECT VERTICES
-                        let k = 0;
-                        let m = k+2;
-                        let s = String::from(m.to_string());
-                        assert!(m == s.parse::<i32>().unwrap());
-                    }
+                println!("{:?}", time_diff);
+                for _ in 0..15000 {      //THIS IS JUST SOME JUNK TO SIMULATE SOME ACTUAL LOGIC TO GET THE CORRECT VERTICES
+                    let k = 0;
+                    let m = k+2;
+                    let s = String::from(m.to_string());
+                    assert!(m == s.parse::<i32>().unwrap());
+                }
 
 
-                    let mut  vertices_lock = vertices.write().unwrap();
-                    if vertices_lock.len() < 100{
-                        *vertices_lock = Vec::new();
-                        let max = 5000;
-                        for i in 0..max{
-                            let close_f = -0.1;
-                            let far_f = -0.9;
-                            let mut i2 = i as f32;
-                            while i2 > max as f32 /10.0 {
-                                i2 -=max as f32 /10.0;
-                            }
-                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) +far_f], tex_i: 0, coords: [1.0, 0.0] });
-                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + far_f], tex_i: 0, coords: [0.0, 0.0] });
-                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
-                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) + far_f], tex_i: 0, coords: [1.0, 0.0] });
-                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
-                            vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [1.0, 1.0] });
-    
+                let mut  vertices_lock = vertices.write().unwrap();
+                if vertices_lock.len() < 100{
+                    *vertices_lock = Vec::new();
+                    let max = 5000;
+                    for i in 0..max{
+                        let close_f = -0.1;
+                        let far_f = -0.9;
+                        let mut i2 = i as f32;
+                        while i2 > max as f32 /10.0 {
+                            i2 -=max as f32 /10.0;
                         }
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) +far_f], tex_i: 0, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + far_f], tex_i: 0, coords: [0.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) + far_f], tex_i: 0, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [1.0, 1.0] });
+                    
                     }
+                }
 
                 
 
-                    let mut rng = rand::thread_rng();
-                    //This puts even more strain on the current thread, later this should be handled by the model thread
-                    if  time_diff.unwrap().as_millis() > 15 {
-                        last_change = SystemTime::now();
-                        
-                        vertices_lock.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
-                        vertices_lock.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
-    
-                    }
+                let mut rng = rand::thread_rng();
+                //This puts even more strain on the current thread, later this should be handled by the model thread
+                if  time_diff.unwrap().as_millis() > 15 {
+                    last_change = SystemTime::now();
                     
-                    if (now_time.duration_since(last_image_added)).unwrap().as_millis() > 7000 {
-                        last_image_added = SystemTime::now();
-                        let index = rng.gen::<u32>() % 2;
-                        let sign = rng.gen_range(0.0..1.0);
-    
-                        let close_f = -0.1;
-                        let far_f = -0.9;
-                        vertices_lock.push(Vertex { position: [sign+close_f, far_f], tex_i: index, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ sign+far_f,  far_f], tex_i: index, coords: [0.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [sign+close_f,  far_f], tex_i: index, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [sign+close_f, close_f], tex_i: index, coords: [1.0, 1.0] });
-    
-                    }
+                    vertices_lock.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
+                    vertices_lock.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
+
+                }
+                
+                if (now_time.duration_since(last_image_added)).unwrap().as_millis() > 7000 {
+                    last_image_added = SystemTime::now();
+                    let index = rng.gen::<u32>() % 2;
+                    let sign = rng.gen_range(0.0..1.0);
+
+                    let close_f = -0.1;
+                    let far_f = -0.9;
+                    vertices_lock.push(Vertex { position: [sign+close_f, far_f], tex_i: index, coords: [1.0, 0.0] });
+                    vertices_lock.push(Vertex { position: [ sign+far_f,  far_f], tex_i: index, coords: [0.0, 0.0] });
+                    vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
+                    vertices_lock.push(Vertex { position: [sign+close_f,  far_f], tex_i: index, coords: [1.0, 0.0] });
+                    vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
+                    vertices_lock.push(Vertex { position: [sign+close_f, close_f], tex_i: index, coords: [1.0, 1.0] });
+
+                }
                
                     
 
