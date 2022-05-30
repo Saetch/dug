@@ -1,5 +1,6 @@
 use bytemuck::{Pod, Zeroable};
-use std::{sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime};
+use rand::Rng;
+use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess, BufferContents},
     command_buffer::{
@@ -90,9 +91,10 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
 
     let mut last_change = SystemTime::now();
-
-    let mut vertices :Vec<Vertex> = vertices_array.to_vec();
+    let mut last_image_added = SystemTime::now();
+    let mut vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(vertices_array.to_vec()));
     drop(vertices_array);
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -160,7 +162,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 
 
                 //safe the current state in the vertex_buffer for drawing
-                vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.clone())
+                vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.read().unwrap().clone())
                 .unwrap();
 
                 // Before we can draw on the output, we have to *acquire* an image from the swapchain. If
@@ -199,7 +201,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 let mut builder = AutoCommandBufferBuilder::primary(
                     device.clone(),
                     queue.family(),
-                    CommandBufferUsage::OneTimeSubmit,      //oneTimeSubmit is more optimized and applicable, since we create a new one every frame
+                    CommandBufferUsage::MultipleSubmit,      //oneTimeSubmit is more optimized and applicable, since we create a new one every frame
                 )
                 .unwrap();
 
@@ -279,14 +281,66 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             //this can be called way more if running on a different thread and thus (and because of hardware limitations aswell),
             //it is needed, to update game-logic with delta-time
             Event::MainEventsCleared => {
-                let now_time = SystemTime::now();
-                println!("{:?}", now_time.duration_since(last_change));
-                if (now_time.duration_since(last_change)).unwrap().as_millis() > 1 {
+                
+                if true{
+                    let now_time = SystemTime::now();
+                    println!("{:?}", now_time.duration_since(last_change));
                     last_change = SystemTime::now();
-                    vertices.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
-                    vertices.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
 
+
+                    let mut  vertices_lock = vertices.write().unwrap();
+
+                    *vertices_lock = Vec::new();
+                    let max = 5000;
+                    for i in 0..max{
+                        let close_f = -0.1;
+                        let far_f = -0.9;
+                        let mut i2 = i as f32;
+                        while i2 > max as f32 /10.0 {
+                            i2 -=max as f32 /10.0;
+                        }
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) +far_f], tex_i: 0, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + far_f], tex_i: 0, coords: [0.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) + far_f], tex_i: 0, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [1.0, 1.0] });
+
+                    }
+                }else{
+                    let mut rng = rand::thread_rng();
+                    let now_time = SystemTime::now();
+                    println!("{:?}", now_time.duration_since(last_change));
+                    if (now_time.duration_since(last_change)).unwrap().as_millis() > 15 {
+                        last_change = SystemTime::now();
+                        let mut vertices_lock = vertices.write().expect("Could not write to vertex-Vector");
+                        
+                        vertices_lock.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
+                        vertices_lock.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
+    
+                    }
+                    
+                    if (now_time.duration_since(last_image_added)).unwrap().as_millis() > 7000 {
+                        last_image_added = SystemTime::now();
+                        let mut vertices_lock = vertices.write().expect("Could not write to vertices-vector");
+                        let index = rng.gen::<u32>() % 2;
+                        let sign = rng.gen_range(0.0..1.0);
+    
+                        let close_f = -0.1;
+                        let far_f = -0.9;
+                        vertices_lock.push(Vertex { position: [sign+close_f, far_f], tex_i: index, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ sign+far_f,  far_f], tex_i: index, coords: [0.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [sign+close_f,  far_f], tex_i: index, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [sign+close_f, close_f], tex_i: index, coords: [1.0, 1.0] });
+    
+                    }
                 }
+
+
+
+
 
             }
             _ => (),
