@@ -27,7 +27,7 @@ use vulkano_win::VkSurfaceBuild;
 use winit::{
     window::{Window, WindowBuilder}, event_loop::EventLoop,
 };
-use crate::rendering::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites};
+use crate::view::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites};
 pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>, Arc<CpuAccessibleBuffer<[Vertex]>>, [Vertex; 12]){
     // instance
 

@@ -1,7 +1,7 @@
 use std::{thread::{ spawn, sleep}, sync::{Arc,  atomic::AtomicBool}, time::Duration};
 use std::sync::atomic;
-use crate::rendering::renderer::vulkano_render;
-mod rendering;
+use crate::view::renderer::vulkano_render;
+mod view;
 fn main(){
     
     let running = Arc::new(AtomicBool::new(true));

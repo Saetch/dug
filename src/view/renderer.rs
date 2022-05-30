@@ -27,7 +27,7 @@ use winit::{
     event_loop::{ControlFlow},
     window::{Window},
 };
-use crate::rendering::renderer_init::*;
+use crate::view::renderer_init::*;
 
 
     // To create a buffer that will store the shape of our triangle.
