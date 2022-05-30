@@ -1,14 +1,38 @@
 
+use std::sync::{Arc, atomic::{AtomicBool, self}};
+
+use flume::Receiver;
+
 use crate::controller::controller_input::MouseInputType;
 
 use super::controller_input::ControllerInput;
 
-pub fn handle_input(input: ControllerInput){
+pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<ControllerInput>){
 
-    match input{
-        ControllerInput::MouseInput { action } => process_mouse_input(action),
-        ControllerInput::KeyboardInput { key: _key, state: _state } => (),
+    while thread_running.load(atomic::Ordering::Relaxed){
+        let inp = receiver.recv();
+        if let Ok(input) = inp{
+
+            //Here, the actual logic gets processed, everything around this is just to keep the loop alive and shut it down when needed
+            match input{
+                ControllerInput::MouseInput { action } => process_mouse_input(action),
+                ControllerInput::KeyboardInput { key: _key, state: _state } => (),
+            }
+
+        }else {
+            if thread_running.load(atomic::Ordering::SeqCst){
+                println!("Could not receive input message from rendering thread!");
+
+            }else{
+                println!("Gracefully stopping the controller thread" );
+
+            }
+            break;
+        }
+        
     }
+
+
 }
 
 

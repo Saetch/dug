@@ -2,7 +2,7 @@ use std::{thread::{ spawn, sleep, self, JoinHandle}, sync::{Arc,  atomic::Atomic
 use std::sync::atomic;
 use controller::controller_input::ControllerInput;
 
-use crate::{view::renderer::vulkano_render, controller::controller::handle_input};
+use crate::{view::renderer::vulkano_render, controller::controller::handle_input_loop};
 mod controller;
 mod view;
 fn main(){
@@ -43,22 +43,10 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<A
     let thread_running = running.clone();
 
     let controller_thread = thread::spawn(move ||{
-        while thread_running.load(atomic::Ordering::Relaxed){
-            let inp = receiver.recv();
-            if let Ok(input) = inp{
-                handle_input(input);
-            }else {
-                if thread_running.load(atomic::Ordering::SeqCst){
-                    println!("Could not receive input message from rendering thread!");
 
-                }else{
-                    println!("Gracefully stopping the controller thread" );
 
-                }
-                break;
-            }
-            
-        }
+        handle_input_loop(thread_running, receiver);
+
         println!("Oh no! I'm getting terminated! Brhsshh!");
     });
 
