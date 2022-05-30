@@ -288,7 +288,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     last_change = SystemTime::now();
 
                     println!("{:?}", time_diff);
-                    for _ in 0..20000 {      //THIS IS JUST SOME JUNK TO SIMULATE SOME ACTUAL LOGIC TO GET THE CORRECT VERTICES
+                    for _ in 0..15000 {      //THIS IS JUST SOME JUNK TO SIMULATE SOME ACTUAL LOGIC TO GET THE CORRECT VERTICES
                         let k = 0;
                         let m = k+2;
                         let s = String::from(m.to_string());
