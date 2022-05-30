@@ -3,7 +3,7 @@ use std::{sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime}
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents, ClearColorImageInfo,
+        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
     },
     image::{
         view::ImageView, ImageAccess,
@@ -155,6 +155,11 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     recreate_swapchain = false;
                 }
 
+
+                //safe the current state in the vertex_buffer for drawing
+                vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
+                .unwrap();
+
                 // Before we can draw on the output, we have to *acquire* an image from the swapchain. If
                 // no image is available (which happens if you submit draw commands too quickly), then the
                 // function will block.
@@ -191,7 +196,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 let mut builder = AutoCommandBufferBuilder::primary(
                     device.clone(),
                     queue.family(),
-                    CommandBufferUsage::MultipleSubmit,
+                    CommandBufferUsage::OneTimeSubmit,      //oneTimeSubmit is more optimized and applicable, since we create a new one every frame
                 )
                 .unwrap();
 
@@ -277,9 +282,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     last_change = SystemTime::now();
                     vertices.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
                     vertices.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
-                    //TODO: This should not be here, the vertex_buffer should be recreated when drawing, not when updating the logic
-                    vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
-                                    .unwrap();
+
                 }
 
             }

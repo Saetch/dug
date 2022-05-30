@@ -1,6 +1,6 @@
 use std::{sync::Arc, io::Cursor};
 
-use vulkano::{pipeline::{GraphicsPipeline, PipelineLayout, layout::PipelineLayoutCreateInfo, graphics::{vertex_input::BuffersDefinition, viewport::ViewportState, color_blend::ColorBlendState}, Pipeline}, descriptor_set::{PersistentDescriptorSet, layout::{DescriptorSetLayoutCreateInfo, DescriptorSetLayout, DescriptorSetLayoutCreationError}, WriteDescriptorSet}, image::{ImageDimensions, ImmutableImage, MipmapsCount, view::ImageView}, format::Format, sampler::{Sampler, SamplerCreateInfo, Filter, SamplerAddressMode}, render_pass::{Subpass, RenderPass}, device::{Queue, Device}, shader::ShaderModule};
+use vulkano::{pipeline::{GraphicsPipeline, PipelineLayout, layout::PipelineLayoutCreateInfo, graphics::{vertex_input::BuffersDefinition, viewport::ViewportState, color_blend::ColorBlendState, input_assembly::{InputAssemblyState, PrimitiveTopology}}, Pipeline}, descriptor_set::{PersistentDescriptorSet, layout::{DescriptorSetLayoutCreateInfo, DescriptorSetLayout, DescriptorSetLayoutCreationError}, WriteDescriptorSet}, image::{ImageDimensions, ImmutableImage, MipmapsCount, view::ImageView}, format::Format, sampler::{Sampler, SamplerCreateInfo, Filter, SamplerAddressMode}, render_pass::{Subpass, RenderPass}, device::{Queue, Device}, shader::ShaderModule};
 
 use super::renderer::Vertex;
 
@@ -118,6 +118,7 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
     let pipeline = GraphicsPipeline::start()
         // We need to indicate the layout of the vertices.
         .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
+        //.input_assembly_state(InputAssemblyState::new().topology(PrimitiveTopology::TriangleStrip))   //this will make it possible to define a rectangle sprite with just 4 vertices. BUT it will ultimately force multiple Vertices to all be connected. No good for a lot of vertices that represent distinct sprites. This could be used for smaller actions
         // A Vulkan shader can in theory contain multiple entry points, so we have to specify
         // which one.
         .vertex_shader(vs.entry_point("main").unwrap(), ())
