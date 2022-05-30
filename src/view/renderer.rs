@@ -294,33 +294,32 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     let s = String::from(m.to_string());
                     assert!(m == s.parse::<i32>().unwrap());
                 }
+                let mut rng = rand::thread_rng();
 
 
                 let mut  vertices_lock = vertices.write().unwrap();
                 if vertices_lock.len() < 100{
                     *vertices_lock = Vec::new();
                     let max = 5000;
-                    for i in 0..max{
-                        let close_f = -0.1;
-                        let far_f = -0.9;
-                        let mut i2 = i as f32;
-                        while i2 > max as f32 /10.0 {
-                            i2 -=max as f32 /10.0;
-                        }
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) +far_f], tex_i: 0, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + far_f], tex_i: 0, coords: [0.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0) + far_f], tex_i: 0, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + far_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [ i2 as f32 / ((max/10) as f32) + close_f, ((i/(max /10)) as f32 / 10.0)  + close_f], tex_i: 0, coords: [1.0, 1.0] });
+                    for _i in 0..max{
+                        let side_length = 0.8;
+                        let x :f32 = rng.gen_range(-1.0..=0.2);
+                        let y :f32 = rng.gen_range(-1.0..=0.2);
+
+                        vertices_lock.push(Vertex { position: [x + side_length, y], tex_i: 0, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [x, y], tex_i: 0, coords: [0.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [x, y + side_length], tex_i: 0, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [x + side_length, y], tex_i: 0, coords: [1.0, 0.0] });
+                        vertices_lock.push(Vertex { position: [x, y + side_length], tex_i: 0, coords: [0.0, 1.0] });
+                        vertices_lock.push(Vertex { position: [x +side_length, y+side_length], tex_i: 0, coords: [1.0, 1.0] });
                     
                     }
                 }
 
                 
 
-                let mut rng = rand::thread_rng();
                 //This puts even more strain on the current thread, later this should be handled by the model thread
+                //move all pictures down
                 if  time_diff.unwrap().as_millis() > 15 {
                     last_change = SystemTime::now();
                     
@@ -328,7 +327,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     vertices_lock.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
 
                 }
-                
+                //add a picture every 7 seoncds
                 if (now_time.duration_since(last_image_added)).unwrap().as_millis() > 7000 {
                     last_image_added = SystemTime::now();
                     let index = rng.gen::<u32>() % 2;

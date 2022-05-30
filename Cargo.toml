@@ -18,9 +18,9 @@ log = "0.4"
 vulkano = { git = "https://github.com/vulkano-rs/vulkano" }
 vulkano-win = { git = "https://github.com/vulkano-rs/vulkano" }
 vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano" }
-
+flume = "*"
 pollster = "0.2.5"      #can poll stuff, wait for async returns in synchronous code
-
+single_value_channel = "1.2.2"
 
 
 [profile.release_opt]
