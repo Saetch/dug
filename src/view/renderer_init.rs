@@ -1,5 +1,5 @@
 
-use std::{sync::{Arc}, array};
+use std::{sync::{Arc}};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     descriptor_set::{

@@ -2,7 +2,7 @@ use bytemuck::{Pod, Zeroable};
 use rand::Rng;
 use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess, BufferContents},
+    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
     },
@@ -49,7 +49,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     
     
     let (device, queue, pipeline, images, render_pass, event_loop
-    , surface,mut swapchain, descriptor_set,mut vertex_buffer,mut vertices_array)
+    , surface,mut swapchain, descriptor_set,mut vertex_buffer,vertices_array)
      = init();
     
 
@@ -92,7 +92,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
     let mut last_change = SystemTime::now();
     let mut last_image_added = SystemTime::now();
-    let mut vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(vertices_array.to_vec()));
+    let vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(vertices_array.to_vec()));
     drop(vertices_array);
 
     event_loop.run(move |event, _, control_flow| {
