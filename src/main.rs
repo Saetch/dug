@@ -1,10 +1,13 @@
-use std::{thread::{ spawn, sleep, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool}, time::Duration};
-use std::sync::atomic;
+use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool}};
 use controller::controller_input::ControllerInput;
+use model::model::model_loop;
 
 use crate::{view::renderer::vulkano_render, controller::controller::handle_input_loop};
+
 mod controller;
 mod view;
+mod model;
+
 fn main(){
     
 
@@ -30,24 +33,13 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<A
     let thread_running = running.clone();
 
     let model_thread = spawn(move ||{
-        while thread_running.load(atomic::Ordering::Relaxed){
-            
-            println!("Idling! Later I'll be doing stuff for the game!");
-            
-            
-            sleep(Duration::from_millis(4000));
-        }
-        println!("Oh no! I'm getting terminated! Brhsshh!");
+        model_loop(thread_running);
     });
 
     let thread_running = running.clone();
 
     let controller_thread = thread::spawn(move ||{
-
-
         handle_input_loop(thread_running, receiver);
-
-        println!("Oh no! I'm getting terminated! Brhsshh!");
     });
 
 

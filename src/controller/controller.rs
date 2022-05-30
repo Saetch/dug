@@ -32,6 +32,7 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
         
     }
 
+    println!("Oh no! I'm getting terminated! Brhsshh!");
 
 }
 
@@ -39,8 +40,8 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
 fn process_mouse_input(action: MouseInputType){
     match action{
         MouseInputType::Move(x, y) => mouse_moved_action(x,y),
-        MouseInputType::Click { button, state } => (),
-        MouseInputType::Scroll { delta, phase } => (),
+        MouseInputType::Click { button: _, state: _ } => (),
+        MouseInputType::Scroll { delta: _, phase: _ } => (),
         MouseInputType::EnteredWindow => (),
         MouseInputType::LeftWindow =>(),
     }

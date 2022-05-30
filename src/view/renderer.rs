@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use flume::{Sender, SendError};
+use flume::{Sender};
 use rand::Rng;
 use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
@@ -24,7 +24,7 @@ use vulkano::{
 };
 
 use winit::{
-    event::{Event, WindowEvent, MouseButton, VirtualKeyCode},
+    event::{Event, WindowEvent},
     event_loop::{ControlFlow},
     window::{Window},
 };
