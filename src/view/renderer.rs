@@ -36,7 +36,7 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
     // particular example, it doesn't actually change the in-memory representation. This can be understood as represent this data as it would be in C Code
     #[repr(C)]
     #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
-    pub(crate) struct Vertex {
+    pub struct Vertex {
         pub(crate) position: [f32; 2],
         pub(crate) tex_i: u32,
         pub(crate) coords: [f32; 2],

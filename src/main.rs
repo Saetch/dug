@@ -7,6 +7,7 @@ use crate::{view::renderer::vulkano_render, controller::controller::handle_input
 mod controller;
 mod view;
 mod model;
+mod drawable_object;
 
 fn main(){
     
