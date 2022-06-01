@@ -24,9 +24,9 @@ use vulkano::{
 };
 use vulkano_win::VkSurfaceBuild;
 use winit::{
-    window::{Window, WindowBuilder}, event_loop::EventLoop,
+    window::{Window, WindowBuilder}, event_loop::EventLoop, dpi::PhysicalSize,
 };
-use crate::view::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites};
+use crate::{view::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites}, constants::{WINDOW_INIT_X, WINDOW_INIT_Y}};
 pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>){
     // instance
 
@@ -82,6 +82,8 @@ let instance = Instance::new(InstanceCreateInfo {
 let event_loopi = EventLoop::new();
 let surface = WindowBuilder::new()          //abstraction of object that can be drawn to. Get the actual window by calling surface.window()
     .with_title("Driven UnderGround!")
+    .with_inner_size(PhysicalSize::new(WINDOW_INIT_X, WINDOW_INIT_Y))
+    .with_visible(false)
     .build_vk_surface(&event_loopi, instance.clone())
     .unwrap();
 

@@ -13,8 +13,8 @@ pub trait DrawableObject {
     #[inline(always)]
     fn top_right_coords(&self) -> [f32; 2]{
         //const expressions are evaluated at compile time and thus can be used to explicitly tell the compiler to optimize this. Would most likely happen anyway.
-        const ret: [f32; 2] = [1.0, 0.0];
-        return ret;
+        const RET: [f32; 2] = [1.0, 0.0];
+        return RET;
     }
     
     /**
@@ -22,8 +22,8 @@ pub trait DrawableObject {
      */
     #[inline(always)]
     fn top_left_coords(&self) -> [f32; 2]{
-        const ret: [f32; 2] = [0.0, 0.0];
-        return ret;
+        const RET: [f32; 2] = [0.0, 0.0];
+        return RET;
     }
     
     /**
@@ -31,8 +31,8 @@ pub trait DrawableObject {
      */
     #[inline(always)]
     fn bottom_right_coords(&self) -> [f32; 2]{
-        const ret: [f32; 2] = [1.0, 1.0];
-        return ret;
+        const RET: [f32; 2] = [1.0, 1.0];
+        return RET;
     }
     
     /**
@@ -40,8 +40,8 @@ pub trait DrawableObject {
      */
     #[inline(always)]
     fn bottom_left_coords(&self) -> [f32; 2]{
-        const ret: [f32; 2] = [0.0, 1.0];
-        return ret;
+        const RET: [f32; 2] = [0.0, 1.0];
+        return RET;
     }
 
 

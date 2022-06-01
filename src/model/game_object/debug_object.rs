@@ -10,6 +10,12 @@ pub struct DebugObject{
     pub size: f32,
 }
 
+impl DebugObject{
+    pub fn new(position: (f64, f64)) -> Self{
+        DebugObject { position, tex_i: 0, size: 0.4 }
+    }
+}
+
 impl GameObject for DebugObject {}
 
 

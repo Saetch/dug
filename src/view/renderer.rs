@@ -46,7 +46,7 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
 
     
 
-pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>) {
+pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, render_receiver: Arc<RwLock<Vec<Vertex>>>) {
     
     let mut ctr_sender = Some(controller_s);
     let (device, queue, pipeline, images, render_pass, event_loop
@@ -92,10 +92,9 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
 
     let mut last_change = SystemTime::now();
-    let mut last_image_added = SystemTime::now();
     let vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
-
-
+    surface.window().set_visible(true);
+    
     //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -115,10 +114,15 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
             }
             Event::WindowEvent {
-                event: WindowEvent::Resized(_),
+                event: WindowEvent::Resized(phys_size),
                 ..
             } => {
                 recreate_swapchain = true;
+                if let Some(controller_sender) = ctr_sender.clone(){
+                    let width = phys_size.width;
+                    let height = phys_size.height;
+                    controller_sender.send(ControllerInput::WindowResized { dimensions: (width , phys_size.height )  }).expect("Could not send window resized info to the controller");
+                }
             }
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { device_id: _ , input, is_synthetic: _ },
@@ -164,7 +168,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             } => {
                 if let Some(controller_sender) = ctr_sender.clone(){
 
-                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Move(position.x, position.y) }).expect("Could not send mouse moved input details to controller thread");
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Move(position.x as f32, position.y as f32) }).expect("Could not send mouse moved input details to controller thread");
                 }
             }
             Event::WindowEvent {
@@ -221,10 +225,16 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     recreate_swapchain = false;
                 }
 
-                
+                let mut vertices  = render_receiver.read().unwrap().to_vec();                
+
+
+                if vertices.len() == 0{
+                    vertices = Vec::new();
+                    vertices.push(Vertex { position: [1.5, 2.0], tex_i: 0, coords: [2.0, 2.0] });
+                }
 
                 //safe the current state in the vertex_buffer for drawing
-                let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.read().unwrap().clone())
+                let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter())
                 .unwrap();
 
                 // Before we can draw on the output, we have to *acquire* an image from the swapchain. If
@@ -345,73 +355,15 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             Event::MainEventsCleared => {
 
                 
-                
+
+
                 let now_time = SystemTime::now();
                 let time_diff = now_time.duration_since(last_change);
                 last_change = SystemTime::now();
 
-                println!("{:?}", time_diff);
-                for _ in 0..15000 {      //THIS IS JUST SOME JUNK TO SIMULATE SOME ACTUAL LOGIC TO GET THE CORRECT VERTICES
-                    let k = 0;
-                    let m = k+2;
-                    let s = String::from(m.to_string());
-                    assert!(m == s.parse::<i32>().unwrap());
-                }
-                let mut rng = rand::thread_rng();
-
-
-                let mut  vertices_lock = vertices.write().unwrap();
-                if vertices_lock.len() < 100{
-                    *vertices_lock = Vec::new();
-                    let max = 5000;
-                    for _i in 0..max{
-                        let side_length = 0.8;
-                        let x :f32 = rng.gen_range(-1.0..=0.2);
-                        let y :f32 = rng.gen_range(-1.0..=0.2);
-
-                        vertices_lock.push(Vertex { position: [x + side_length, y], tex_i: 0, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [x, y], tex_i: 0, coords: [0.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [x, y + side_length], tex_i: 0, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [x + side_length, y], tex_i: 0, coords: [1.0, 0.0] });
-                        vertices_lock.push(Vertex { position: [x, y + side_length], tex_i: 0, coords: [0.0, 1.0] });
-                        vertices_lock.push(Vertex { position: [x +side_length, y+side_length], tex_i: 0, coords: [1.0, 1.0] });
-                    
-                    }
-                }
-
+                //println!("{:?}", time_diff);
                 
-
-                //This puts even more strain on the current thread, later this should be handled by the model thread
-                //move all pictures down
-                if  time_diff.unwrap().as_millis() > 15 {
-                    last_change = SystemTime::now();
-                    
-                    vertices_lock.iter_mut().for_each(|v| {v.position[1]+= 0.0005 });
-                    vertices_lock.iter_mut().filter(|v| v.tex_i==1).for_each(|v| v.position[1]+=0.0005);
-
-                }
-                //add a picture every 7 seoncds
-                if (now_time.duration_since(last_image_added)).unwrap().as_millis() > 7000 {
-                    last_image_added = SystemTime::now();
-                    let index = rng.gen::<u32>() % 2;
-                    let sign = rng.gen_range(0.0..1.0);
-
-                    let close_f = -0.1;
-                    let far_f = -0.9;
-                    vertices_lock.push(Vertex { position: [sign+close_f, far_f], tex_i: index, coords: [1.0, 0.0] });
-                    vertices_lock.push(Vertex { position: [ sign+far_f,  far_f], tex_i: index, coords: [0.0, 0.0] });
-                    vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
-                    vertices_lock.push(Vertex { position: [sign+close_f,  far_f], tex_i: index, coords: [1.0, 0.0] });
-                    vertices_lock.push(Vertex { position: [ sign+far_f, close_f], tex_i: index, coords: [0.0, 1.0] });
-                    vertices_lock.push(Vertex { position: [sign+close_f, close_f], tex_i: index, coords: [1.0, 1.0] });
-
-                }
-               
-                    
-
-
-
-
+                
             }
             _ => (),
         }
