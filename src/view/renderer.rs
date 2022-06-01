@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use flume::{Sender};
-use rand::Rng;
+
 use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
@@ -92,7 +92,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
 
     let mut last_change = SystemTime::now();
-    let vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
+    let _vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
     surface.window().set_visible(true);
     
     //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
@@ -120,7 +120,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 recreate_swapchain = true;
                 if let Some(controller_sender) = ctr_sender.clone(){
                     let width = phys_size.width;
-                    let height = phys_size.height;
+                    let _height = phys_size.height;
                     controller_sender.send(ControllerInput::WindowResized { dimensions: (width , phys_size.height )  }).expect("Could not send window resized info to the controller");
                 }
             }
@@ -358,7 +358,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
 
                 let now_time = SystemTime::now();
-                let time_diff = now_time.duration_since(last_change);
+                let _time_diff = now_time.duration_since(last_change);
                 last_change = SystemTime::now();
 
                 //println!("{:?}", time_diff);

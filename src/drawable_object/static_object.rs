@@ -7,7 +7,7 @@ pub struct StaticObject{
 }
 
 impl StaticObject {
-    pub fn construct_vertices(&self, camera_position: (f64, f64)) -> [crate::view::renderer::Vertex; 6]{
+    pub fn construct_vertices(&self, _camera_position: (f64, f64)) -> [crate::view::renderer::Vertex; 6]{
         todo!();
     }
 }
