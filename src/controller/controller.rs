@@ -1,13 +1,13 @@
 
-use std::sync::{Arc, atomic::{AtomicBool, self}};
+use std::sync::{Arc, atomic::{AtomicBool, self}, RwLock};
 
 use flume::Receiver;
 
-use crate::controller::controller_input::MouseInputType;
+use crate::{controller::controller_input::MouseInputType, view::renderer::Vertex, model::game_object::GameObject, drawable_object::static_object::StaticObject};
 
-use super::controller_input::ControllerInput;
+use super::{controller_input::ControllerInput, game_state::GameState};
 
-pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<ControllerInput>){
+pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<ControllerInput>, _game_state: Arc<RwLock<GameState>>){
 
     while thread_running.load(atomic::Ordering::Relaxed){
         let inp = receiver.recv();
@@ -50,4 +50,26 @@ fn process_mouse_input(action: MouseInputType){
 //TODO: the actual size of the Window should be compared to these values, so the location of the cursor on the viewPort can be calculated
 fn mouse_moved_action(x: f64, y: f64){
     println!("Mouse moved to: {} / {}",x,y);
+}
+
+
+pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: single_value_channel::Updater<Option<Vec<Vertex>>>, game_objects: Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>>, static_objects : Arc<RwLock<Vec<StaticObject>>>, game_state: Arc<RwLock<GameState>>){
+
+
+
+    while running.load(atomic::Ordering::Relaxed){
+
+        let mut ret_vector = Vec::new();
+
+        let lock = game_objects.read().unwrap();
+
+        lock.iter().for_each(|o| o.construct_vertices(game_state.read().unwrap().camera_pos).into_iter().for_each(|v| ret_vector.push(v)));
+
+        let lock = static_objects.read().unwrap();
+        
+        
+
+        render_sender.update(Some(ret_vector));
+
+    }
 }
