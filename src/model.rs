@@ -1,2 +1,2 @@
 pub mod model;
-mod game_object;
+pub(crate) mod game_object;
