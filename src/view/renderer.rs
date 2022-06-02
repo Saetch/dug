@@ -334,7 +334,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     // the GPU has finished executing the command buffer that draws the triangle.
                     .then_swapchain_present(queue.clone(), swapchain.clone(), image_num)
                     .then_signal_fence_and_flush();
-
+                
                 match future {
                     Ok(future) => {
                         previous_frame_end = Some(future.boxed());

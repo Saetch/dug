@@ -2,15 +2,15 @@ use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, R
 use constants::{WINDOW_INIT_X, WINDOW_INIT_Y};
 use controller::{controller_input::ControllerInput, controller::handle_communication_loop, game_state::GameState};
 use drawable_object::static_object::StaticObject;
-use model::{model::model_loop, game_object::GameObject};
+use model::{model::{ Model}, game_object::GameObject};
 use view::renderer::Vertex;
 use crate::{view::renderer::vulkano_render, controller::controller::handle_input_loop};
 
 mod controller;
 mod view;
-mod model;
 mod drawable_object;
 mod constants;
+mod model;
 
 fn main(){
     
@@ -38,23 +38,27 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<R
     let thread_game_objects = game_objects.clone();
     let thread_static_objects = static_objects.clone();
 
+    let model = Arc::new(Model::new());
+    let thread_mod = model.clone();
     let model_thread = spawn(move ||{
-        model_loop(thread_running, thread_game_objects, thread_static_objects);
+        thread_mod.model_loop(thread_running, thread_game_objects, thread_static_objects);
     });
 
 
 
+    let thread_mod = model.clone();
 
     let thread_running = running.clone();
     let thread_game_state = game_state_arc.clone();
     let (sender, receiver) = flume::unbounded::<ControllerInput>();
 
     let controller_thread = thread::spawn(move ||{
-        handle_input_loop(thread_running, receiver, thread_game_state);
+        handle_input_loop(thread_running, receiver, thread_game_state, thread_mod);
     });
 
 
 
+    let thread_mod = model.clone();
 
     let thread_running = running.clone();
     let thread_game_objects = game_objects.clone();
@@ -67,7 +71,7 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<R
 
 
     let controller_communication_thread = thread::spawn(move ||{
-        handle_communication_loop(thread_running, render_sender, thread_game_objects, thread_static_objects, thread_game_state);
+        handle_communication_loop(thread_running, render_sender, thread_game_objects, thread_static_objects, thread_game_state, thread_mod);
     });
 
 
