@@ -1,13 +1,23 @@
 
-use std::sync::{Arc, atomic::{AtomicBool, self}, RwLock};
+use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}};
 
 use flume::Receiver;
+use winit::event::{VirtualKeyCode, ElementState};
 
 use crate::{controller::controller_input::MouseInputType, view::renderer::Vertex, model::game_object::GameObject, drawable_object::static_object::StaticObject};
 
-use super::{controller_input::ControllerInput, game_state::GameState};
+use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON}};
+
+
+
+
+type KeyboundFunction = fn(Arc<RwLock<GameState>>);
 
 pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<ControllerInput>, game_state: Arc<RwLock<GameState>>){
+
+
+    let mut keybinds = load_default_keybinds();
+
 
     while thread_running.load(atomic::Ordering::Relaxed){
         let inp = receiver.recv();
@@ -16,7 +26,7 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
             //Here, the actual logic gets processed, everything around this is just to keep the loop alive and shut it down when needed
             match input{
                 ControllerInput::MouseInput { action } => process_mouse_input(action, game_state.clone()),
-                ControllerInput::KeyboardInput { key: _key, state: _state } => (),
+                ControllerInput::KeyboardInput { key, state } => process_keyboard_input(key, state, game_state.clone()),
                 ControllerInput::WindowResized { dimensions } => game_state.write().unwrap().window_dimensions = dimensions,
             }
 
@@ -37,6 +47,35 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
 
 }
 
+#[allow(dead_code)]
+fn no_action(_game_state: Arc<RwLock<GameState>>){
+
+}
+
+//TODO, execute these actions on correct key press
+fn up_action(game_state: Arc<RwLock<GameState>>){
+    let mut lock = game_state.write().unwrap();
+
+    lock.camera_movement_speed = (lock.camera_movement_speed.0 - 0.5, lock.camera_movement_speed.1);
+}
+
+fn load_default_keybinds() -> Vec<Option<KeyboundFunction>>{
+    let mut ret = Vec::new();
+    //TODO: add a config file for bound defaults, fallback to code, if none is present
+    //see button_constants.rs, to figure out how the indices represent different keys
+
+    ret.resize(4, None);
+    let fn_pointer: KeyboundFunction = up_action;
+    ret[W_BUTTON] = Some(fn_pointer);
+    let fn_pointer: KeyboundFunction = no_action;
+    ret[D_BUTTON] = Some(fn_pointer);
+    let fn_pointer: KeyboundFunction = no_action;
+    ret[S_BUTTON] = Some(fn_pointer);
+    let fn_pointer: KeyboundFunction = no_action;
+    ret[A_BUTTON] = Some(fn_pointer);
+    return ret;
+}
+
 
 fn process_mouse_input(action: MouseInputType, game_state: Arc<RwLock<GameState>>){
     match action{
@@ -45,6 +84,14 @@ fn process_mouse_input(action: MouseInputType, game_state: Arc<RwLock<GameState>
         MouseInputType::Scroll { delta: _, phase: _ } => (),
         MouseInputType::EnteredWindow => (),
         MouseInputType::LeftWindow =>(),
+    }
+}
+
+fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState, game_state: Arc<RwLock<GameState>>){
+    if  let Some(key) = key_input {
+        game_state.is_poisoned();
+        println!("Input: {:?}, {:?}", key, state);
+
     }
 }
 

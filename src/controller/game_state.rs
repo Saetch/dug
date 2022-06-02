@@ -6,13 +6,19 @@ pub struct GameState{
     pub camera_pos:  (f64, f64),
     pub cursor_pos_relative: (f32, f32),
     pub window_dimensions: (u32, u32),
+    pub camera_movement_speed: (f64, f64),
 }
 
 
 impl GameState {
     pub fn new(window_dimensions: (u32, u32)) -> Self{
         //game_state_id is supposed to hold information about what part of the game you're in
-        GameState { game_state_id: AtomicU8::new(1), camera_pos: (0.0,0.0), cursor_pos_relative: (0.0, 0.0), window_dimensions: window_dimensions }
+        GameState { 
+            game_state_id: AtomicU8::new(1),
+            camera_pos: (0.0,0.0), cursor_pos_relative: (0.0, 0.0),
+            window_dimensions: window_dimensions,
+            camera_movement_speed: (0.0, 0.0),
+         }
     }
 
 
