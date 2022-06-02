@@ -8,7 +8,7 @@ use crate::{controller::controller_input::MouseInputType, view::renderer::Vertex
 
 use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON}};
 
-
+use spin_sleep::LoopHelper;
 
 
 type KeyboundFunction = fn(Arc<RwLock<GameState>>);
@@ -107,21 +107,38 @@ fn mouse_moved_action(x: f32, y: f32, game_state: Arc<RwLock<GameState>>){
 
 pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<RwLock<Vec<Vertex>>>, game_objects: Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>>, static_objects : Arc<RwLock<Vec<StaticObject>>>, game_state: Arc<RwLock<GameState>>){
 
+    let mut loop_helper = LoopHelper::builder()
+    .report_interval_s(0.5) // report every half a second
+    .build_with_target_rate(69.0); // limit to 90 FPS if possible
 
+
+    let mut current_fps = None;
 
     while running.load(atomic::Ordering::Relaxed){
+        let delta = loop_helper.loop_start(); // or .loop_start_s() for f64 seconds
+
+
+
         let mut ret_vector = Vec::new();
         let camera_pos = game_state.read().unwrap().camera_pos;
         let lock = game_objects.read().unwrap();
 
         lock.iter().for_each(|o| o.construct_vertices(camera_pos).into_iter().for_each(|v| ret_vector.push(v)));
 
+        drop(lock);
         let lock = static_objects.read().unwrap();
 
         lock.iter().for_each(|o| o.construct_vertices(camera_pos).into_iter().for_each(|v| ret_vector.push(v)));
         drop(lock);        
 
         *render_sender.write().unwrap() = ret_vector;
-
+            
+        if let Some(fps) = loop_helper.report_rate() {
+            current_fps = Some(fps);
+        }
+        if let Some(fp) = current_fps {
+            println!("Rebuild shared vertex_buffer (Vector) per seconds: {}", fp);
+        }
+        loop_helper.loop_sleep();
     }
 }
