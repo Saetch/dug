@@ -6,10 +6,10 @@ pub trait DrawableObject {
      */
     #[inline(always)]
     fn construct_vertices(&self, camera_position: (f64, f64), window_dimensions_ingame: (f64, f64)) -> [Vertex; 6]{
-        let x = ( self.get_position().0 - camera_position.0 ) as f32;
-        let y = ( self.get_position().1 - camera_position.1 ) as f32;
-        let size_x = self.get_size() / (window_dimensions_ingame.0 as f32) * 2.0;
-        let size_y = self.get_size() / (window_dimensions_ingame.1 as f32) * 2.0;
+        let x = (( self.get_position().0 - camera_position.0 ) as f32) /window_dimensions_ingame.0 as f32;
+        let y = (( self.get_position().1 - camera_position.1 ) as f32) /window_dimensions_ingame.1 as f32;
+        let size_x = self.get_size() / (window_dimensions_ingame.0 as f32);
+        let size_y = self.get_size() / (window_dimensions_ingame.1 as f32);
         let tex_i = self.get_tex_i();
         [
             Vertex{

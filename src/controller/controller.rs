@@ -2,16 +2,16 @@
 use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}};
 
 use flume::Receiver;
-use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta, TouchPhase};
+use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta};
 
-use crate::{controller::controller_input::MouseInputType, view::renderer::Vertex, model::{game_object::{GameObject, debug_object::DebugObject}, model::Model}, drawable_object::static_object::StaticObject};
+use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{GameObject, debug_object::DebugObject}, model::Model}, drawable_object::static_object::StaticObject};
 
 use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, SPACE_BAR}};
 
 use spin_sleep::LoopHelper;
 
 
-type KeyboundFunction = fn(Arc<RwLock<GameState>>, Arc<Model>);
+pub(crate) type KeyboundFunction = fn(&Arc<RwLock<GameState>>, &Arc<Model>);
 
 pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<ControllerInput>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
@@ -25,8 +25,8 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
 
             //Here, the actual logic gets processed, everything around this is just to keep the loop alive and shut it down when needed
             match input{
-                ControllerInput::MouseInput { action } => process_mouse_input(action, game_state.clone(), &keybinds, model_pointer.clone()),
-                ControllerInput::KeyboardInput { key, state } => process_keyboard_input(key, state, game_state.clone(), &keybinds, model_pointer.clone()),
+                ControllerInput::MouseInput { action } => process_mouse_input(action, &game_state, &keybinds, &model_pointer),
+                ControllerInput::KeyboardInput { key, state } => process_keyboard_input(key, state, &game_state, &keybinds, &model_pointer),
                 ControllerInput::WindowResized { dimensions } => game_state.write().unwrap().window_dimensions = dimensions,
             }
 
@@ -48,60 +48,52 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
 }
 
 #[allow(dead_code)]
-fn no_action(_game_state: Arc<RwLock<GameState>>, _model: Arc<Model>){
+pub(crate) fn no_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
 
 }
 
 //TODO, execute these actions on correct key press
-fn up_action(game_state: Arc<RwLock<GameState>>, _model: Arc<Model>){
+pub(crate) fn up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().unwrap();
 
     lock.camera_movement_speed = (lock.camera_movement_speed.0 - 0.5, lock.camera_movement_speed.1);
 }
 
-fn load_default_keybinds() -> Vec<Option<KeyboundFunction>>{
-    let mut ret = Vec::new();
-    //TODO: add a config file for bound defaults, fallback to code, if none is present
-    //see button_constants.rs, to figure out how the indices represent different keys
 
-    ret.resize(8, None);
-    let fn_pointer: KeyboundFunction = up_action;
-    ret[W_BUTTON] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = no_action;
-    ret[D_BUTTON] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = no_action;
-    ret[S_BUTTON] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = no_action;
-    ret[A_BUTTON] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = place_debug_object_action;
-    ret[MOUSE_LEFT] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = no_action;
-    ret[MOUSE_RIGHT] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = no_action;
-    ret[MOUSE_MIDDLE] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = no_action;
-    ret[SPACE_BAR] = Some(fn_pointer);
-    return ret;
+
+pub(crate) fn half_screen_width_ingame_regular(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut game_state_lock = game_state.write().unwrap();
+    game_state_lock.window_dimensions_ingame = (1.0, 1.0);
+}
+
+pub(crate) fn half_screen_width_ingame_2times(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut game_state_lock = game_state.write().unwrap();
+    game_state_lock.window_dimensions_ingame = (2.0, 2.0);
+}
+
+pub(crate) fn half_screen_width_ingame_point5times(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut game_state_lock = game_state.write().unwrap();
+    game_state_lock.window_dimensions_ingame = (0.5, 0.5);
 }
 
 
-fn process_mouse_input(action: MouseInputType, game_state: Arc<RwLock<GameState>>, keybinds: &Vec<Option<KeyboundFunction>>, model_pointer:  Arc<Model>){
+fn process_mouse_input(action: MouseInputType, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<Option<KeyboundFunction>>, model_pointer:  &Arc<Model>){
     match action{
-        MouseInputType::Move(x, y) => mouse_moved_action(x,y, game_state.clone()),
+        MouseInputType::Move(x, y) => mouse_moved_action(x,y, game_state),
         MouseInputType::Click { button, state } =>
         if state == ElementState::Pressed{
             if let Some(func) = keybinds[MOUSE_LEFT] {
-                func(game_state.clone(), model_pointer.clone())
+                func(&game_state, &model_pointer)
             }
         },
 
-        MouseInputType::Scroll { delta, phase : _phase } => process_mouse_scroll(delta, game_state.clone()),
+        MouseInputType::Scroll { delta, phase : _phase } => process_mouse_scroll(delta, game_state),
         MouseInputType::EnteredWindow => (),
         MouseInputType::LeftWindow =>(),
     }
 }
 
-fn place_debug_object_action(game_state: Arc<RwLock<GameState>>, model: Arc<Model>){
+pub(crate) fn place_debug_object_action(game_state: &Arc<RwLock<GameState>>, model: &Arc<Model>){
 
     let lock = game_state.read().unwrap();
     let mouse_coords = lock.cursor_pos_ingame;
@@ -112,15 +104,28 @@ fn place_debug_object_action(game_state: Arc<RwLock<GameState>>, model: Arc<Mode
 
 }
 
-fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState, game_state: Arc<RwLock<GameState>>, keybinds: &Vec<Option<KeyboundFunction>>, model_pointer:  Arc<Model>){
+pub(crate) fn simulate_mouse_wheel_up(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    process_mouse_scroll(MouseScrollDelta::LineDelta(0.0, 1.0), game_state);
+}
+
+pub(crate) fn simulate_mouse_wheel_down(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    process_mouse_scroll(MouseScrollDelta::LineDelta(0.0, -1.0), game_state);
+}
+
+fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<Option<KeyboundFunction>>, model:  &Arc<Model>){
     if  let Some(key) = key_input {
-        game_state.is_poisoned();
+        match state {
+            ElementState::Pressed => key_action_pressed(key, game_state, keybinds, model),
+            ElementState::Released => key_action_released(key, game_state, keybinds, model),
+        }
+
+
         println!("Input: {:?}, {:?}", key, state);
 
     }
 }
 
-fn mouse_moved_action(x: f32, y: f32, game_state: Arc<RwLock<GameState>>){
+fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
     let lock = game_state.read().expect("Could not read current gameState in mouse_moved_action!");
     let screen_center_pos = lock.camera_pos;
     let half_screen_width = lock.window_dimensions_ingame.0;
@@ -141,7 +146,8 @@ fn mouse_moved_action(x: f32, y: f32, game_state: Arc<RwLock<GameState>>){
     println!("Cursor moved to {} / {} -> {} / {}" , c_p_r.0, c_p_r.1, c_p_ig.0, c_p_ig.1);
 }
 
-pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: Arc<RwLock<GameState>>){
+//process mouse_wheel
+pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<GameState>>){
 
     match delta {
         MouseScrollDelta::LineDelta(_horizontal, vertical) => {
@@ -193,6 +199,9 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
         if let Some(_fp) = current_fps {
             //println!("Rebuild shared vertex_buffer (Vector) per seconds: {}", _fp);
         }
+
+
+
         loop_helper.loop_sleep();
     }
 
