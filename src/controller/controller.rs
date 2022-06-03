@@ -52,7 +52,6 @@ pub(crate) fn no_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model
 
 }
 
-//TODO, execute these actions on correct key press
 pub(crate) fn up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     todo!();
 }
@@ -90,12 +89,13 @@ pub(crate) fn half_screen_width_ingame_point5times(game_state: &Arc<RwLock<GameS
 }
 
 
-fn process_mouse_input(action: MouseInputType, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<Option<KeyboundFunction>>, model_pointer:  &Arc<Model>){
+fn process_mouse_input(action: MouseInputType, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<(Option<KeyboundFunction>, Option<KeyboundFunction>)>, model_pointer:  &Arc<Model>){
     match action{
         MouseInputType::Move(x, y) => mouse_moved_action(x,y, game_state),
         MouseInputType::Click { button, state } =>
         if state == ElementState::Pressed{
-            if let Some(func) = keybinds[MOUSE_LEFT] {
+            //.0 for keydown action. TODO: Implement correct behavior that distinguishes between keyup, keydown
+            if let Some(func) = keybinds[MOUSE_LEFT].0 {
                 func(&game_state, &model_pointer)
             }
         },
@@ -125,7 +125,7 @@ pub(crate) fn simulate_mouse_wheel_down(game_state: &Arc<RwLock<GameState>>, _mo
     process_mouse_scroll(MouseScrollDelta::LineDelta(0.0, -1.0), game_state);
 }
 
-fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<Option<KeyboundFunction>>, model:  &Arc<Model>){
+fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<(Option<KeyboundFunction>, Option<KeyboundFunction>)>, model:  &Arc<Model>){
     if  let Some(key) = key_input {
         match state {
             ElementState::Pressed => key_action_pressed(key, game_state, keybinds, model),
@@ -188,6 +188,7 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
         let mut ret_vector = Vec::new();
         let lock = game_state.read().expect("Could not read gameState in communication loop!");
         let camera_pos = lock.camera_pos;
+        let cam_speed = lock.camera_movement_speed;
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let lock = model_pointer.game_objects.read().unwrap();
@@ -201,12 +202,11 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
         drop(lock);        
 
         *render_sender.write().unwrap() = ret_vector;
-            
+        
+        
+
         if let Some(fps) = loop_helper.report_rate() {
             current_fps = Some(fps);
-        }
-        if let Some(_fp) = current_fps {
-            //println!("Rebuild shared vertex_buffer (Vector) per seconds: {}", _fp);
         }
 
 
