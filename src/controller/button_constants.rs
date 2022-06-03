@@ -10,3 +10,5 @@ pub(crate) const SPACE_BAR: usize = 7;
 pub(crate) const CTRL: usize = 8;
 pub(crate) const J_BUTTON: usize = 9;
 pub(crate) const L_BUTTON: usize = 10;
+pub(crate) const I_BUTTON: usize = 11;
+pub(crate) const O_BUTTON: usize = 12;

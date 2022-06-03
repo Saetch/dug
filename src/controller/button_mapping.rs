@@ -4,21 +4,21 @@ use winit::event::VirtualKeyCode;
 
 use crate::model::model::Model;
 
-use super::{controller::{KeyboundFunction, up_action, half_screen_width_ingame_point5times, no_action, half_screen_width_ingame_2times, place_debug_object_action, half_screen_width_ingame_regular, simulate_mouse_wheel_up, simulate_mouse_wheel_down}, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, SPACE_BAR, CTRL, J_BUTTON, L_BUTTON}, game_state::GameState};
+use super::{controller::{KeyboundFunction, up_action, half_screen_width_ingame_point5times, no_action, half_screen_width_ingame_2times, place_debug_object_action, half_screen_width_ingame_regular, simulate_mouse_wheel_up, simulate_mouse_wheel_down, camera_up_action, camera_right_action, camera_down_action, camera_left_action}, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, SPACE_BAR, CTRL, J_BUTTON, L_BUTTON, I_BUTTON, O_BUTTON}, game_state::GameState};
 
 pub(crate) fn load_default_keybinds() -> Vec<Option<KeyboundFunction>>{
     let mut ret = Vec::new();
     //TODO: add a config file for bound defaults, fallback to code, if none is present
     //see button_constants.rs, to figure out how the indices represent different keys
 
-    ret.resize(11, None);
-    let fn_pointer: KeyboundFunction = up_action;
+    ret.resize(13, None);
+    let fn_pointer: KeyboundFunction = camera_up_action;
     ret[W_BUTTON] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = half_screen_width_ingame_point5times;
+    let fn_pointer: KeyboundFunction = camera_right_action;
     ret[D_BUTTON] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = no_action;
+    let fn_pointer: KeyboundFunction = camera_down_action;
     ret[S_BUTTON] = Some(fn_pointer);
-    let fn_pointer: KeyboundFunction = half_screen_width_ingame_2times;
+    let fn_pointer: KeyboundFunction = camera_left_action;
     ret[A_BUTTON] = Some(fn_pointer);
     let fn_pointer: KeyboundFunction = place_debug_object_action;
     ret[MOUSE_LEFT] = Some(fn_pointer);
@@ -32,7 +32,10 @@ pub(crate) fn load_default_keybinds() -> Vec<Option<KeyboundFunction>>{
     ret[J_BUTTON] = Some(fn_pointer);
     let fn_pointer: KeyboundFunction = simulate_mouse_wheel_down;
     ret[L_BUTTON] = Some(fn_pointer);
-
+    let fn_pointer: KeyboundFunction = half_screen_width_ingame_point5times;
+    ret[I_BUTTON] = Some(fn_pointer);
+    let fn_pointer: KeyboundFunction = half_screen_width_ingame_2times;
+    ret[O_BUTTON] = Some(fn_pointer);
 
 
 

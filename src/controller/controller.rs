@@ -54,11 +54,24 @@ pub(crate) fn no_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model
 
 //TODO, execute these actions on correct key press
 pub(crate) fn up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
-    let mut lock = game_state.write().unwrap();
-
-    lock.camera_movement_speed = (lock.camera_movement_speed.0 - 0.5, lock.camera_movement_speed.1);
+    todo!();
 }
 
+pub(crate) fn camera_down_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    todo!();
+}
+
+pub(crate) fn camera_up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    todo!();
+}
+
+pub(crate) fn camera_right_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    todo!();
+}
+
+pub(crate) fn camera_left_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    todo!();
+}
 
 
 pub(crate) fn half_screen_width_ingame_regular(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
