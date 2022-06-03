@@ -119,9 +119,6 @@ fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState
             ElementState::Released => key_action_released(key, game_state, keybinds, model),
         }
 
-
-        println!("Input: {:?}, {:?}", key, state);
-
     }
 }
 
@@ -153,7 +150,6 @@ pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<Gam
         MouseScrollDelta::LineDelta(_horizontal, vertical) => {
             let mut lock = game_state.write().expect("Could not write to gameState on mouse scroll!");
             lock.window_dimensions_ingame = (lock.window_dimensions_ingame.0 - vertical as f64*0.1, lock.window_dimensions_ingame.1 - vertical as f64* 0.1);
-            println!("win_dimensions: {:?}", lock.window_dimensions_ingame.0);
         },
         MouseScrollDelta::PixelDelta(_) => println!("PixelDeltaMouseInputDetected! Not implemented"),
     }
