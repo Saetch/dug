@@ -32,46 +32,21 @@ unsafe impl Sync for DebugObject{
 }
 
 impl DrawableObject for DebugObject {
-    fn construct_vertices(&self, camera_position: (f64, f64) ) -> [crate::view::renderer::Vertex; 6] {
-        let x = ( self.position.0 - camera_position.0 ) as f32;
-        let y = ( self.position.1 - camera_position.1 ) as f32;
-        let size = self.size;
-        let tex_i = self.tex_i;
-        [
-            Vertex{
-                position: [x+size, y-size],
-                tex_i,
-                coords: self.top_right_coords(),
-            },
-            Vertex{
-                position: [x-size, y-size],
-                tex_i,
-                coords: self.top_left_coords(),
-            },
-            Vertex{
-                position: [x-size, y+size],
-                tex_i,
-                coords: self.bottom_left_coords(),
-            },
-            Vertex{
-                position: [x+size, y-size],
-                tex_i,
-                coords: self.top_right_coords(),
-            },
-            Vertex{
-                position: [x-size, y+size],
-                tex_i,
-                coords: self.bottom_left_coords(),
-            },
-            Vertex{
-                position: [x+size, y+size],
-                tex_i,
-                coords: self.bottom_right_coords(),
-            }
-            
-        ]
+    //this can be overridden if needed, to go for custom behavior. 
+    //fn construct_vertices(&self, camera_position: (f64, f64), window_dimensions_ingame: (f64,f64)) -> [crate::view::renderer::Vertex; 6] 
+    #[inline(always)]
+    fn get_position(&self) -> (f64, f64) {
+        self.position
     }
-
+    #[inline(always)]
+    fn get_size(&self) -> f32 {
+        self.size
+    }
+    #[inline(always)]
+    fn get_tex_i(&self) -> u32 {
+        self.tex_i
+    }
+    #[inline(always)]
     fn process_animation(&mut self, delta_time: f64) {
         println!("If I had an animation, this would cycle to the next image!, dt: {}", delta_time);
     }

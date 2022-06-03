@@ -32,16 +32,15 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<R
     let running = Arc::new(AtomicBool::new(true));
 
 
-    let (game_state_arc, game_objects, static_objects) = create_game_structs();
+    let game_state_arc = create_game_structs();
 
     let thread_running = running.clone();
-    let thread_game_objects = game_objects.clone();
-    let thread_static_objects = static_objects.clone();
+
 
     let model = Arc::new(Model::new());
     let thread_mod = model.clone();
     let model_thread = spawn(move ||{
-        thread_mod.model_loop(thread_running, thread_game_objects, thread_static_objects);
+        thread_mod.model_loop(thread_running);
     });
 
 
@@ -61,8 +60,8 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<R
     let thread_mod = model.clone();
 
     let thread_running = running.clone();
-    let thread_game_objects = game_objects.clone();
-    let thread_static_objects = static_objects.clone();
+
+
     let thread_game_state = game_state_arc.clone();
     //let (wakeup_sender, wakeup_receiver) = flume::bounded(1);             //if decided to wake up the controller communication thread instead of letting it run all the time
     let render_receiver = Arc::new(RwLock::new(Vec::new()));
@@ -71,7 +70,7 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<R
 
 
     let controller_communication_thread = thread::spawn(move ||{
-        handle_communication_loop(thread_running, render_sender, thread_game_objects, thread_static_objects, thread_game_state, thread_mod);
+        handle_communication_loop(thread_running, render_sender, thread_game_state, thread_mod);
     });
 
 
@@ -80,13 +79,13 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<R
 
 /**
  * here, the actual construction of shared data types needed for the different threads is done
+ * if performance is ever going to be as critical as possible, it might be reasonable to un-objectify the model, change it to a loop type function only and share the pointers
+ * to the different data field directly to the other threads, just like it's done with game_state 
  */
-fn create_game_structs() -> (Arc<RwLock<GameState>>, Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>>, Arc<RwLock<Vec<StaticObject>>>){
-    //GameObjects will inevitably be of different sizes in memory, so in Order to put them in a vector, which has a set size
-    //per entry, it is needed to allocate them on the heap and only put a pointer (Box<>) in the vector
-    let game_objects :Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>> = Arc::new(RwLock::new(Vec::new()));
-    let static_objects: Arc<RwLock<Vec<StaticObject>>> = Arc::new(RwLock::new(Vec::new()));
+fn create_game_structs() -> Arc<RwLock<GameState>>{
+
+
     let game_state_arc = Arc::new(RwLock::new(GameState::new((WINDOW_INIT_X, WINDOW_INIT_Y))));
 
-    return (game_state_arc, game_objects, static_objects);
+    return game_state_arc;
 }

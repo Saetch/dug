@@ -8,6 +8,14 @@ use super::game_object::debug_object::DebugObject;
 
 
 pub struct Model{
+    //GameObjects will inevitably be of different sizes in memory, so in Order to put them in a vector, which has a set size
+    //per entry, it is needed to allocate them on the heap and only put a pointer (Box<>) in the vector
+
+    //in order to enable simultaneous access to the model and its subsequent data types, it is needed to ensure that it is immutable
+    //the only way to ensure this is to make every data field that can be changed interiorly mutable, by wrapping its type into something
+    //like arc. data that is accessed by the model in the loop and only be the model itself should probably be moved into the loop itself
+    pub game_objects: Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>>,
+    pub static_objects: Arc<RwLock<Vec<StaticObject>>>,
 
 }
 
@@ -16,14 +24,17 @@ pub struct Model{
 impl Model {
 
     pub fn new() -> Self{
-        Model{}
+        Model{
+            game_objects: Arc::new(RwLock::new(Vec::new())),
+            static_objects: Arc::new(RwLock::new(Vec::new())),
+        }
     }
 
 
-    pub fn model_loop(&self, thread_running: Arc<AtomicBool>, game_objects: Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>>, static_objects : Arc<RwLock<Vec<StaticObject>>>){
+    pub fn model_loop(&self, thread_running: Arc<AtomicBool>){
 
 
-        self.construct_game_logic(game_objects.clone(), static_objects.clone());
+        self.construct_game_logic();
     
     
         while thread_running.load(atomic::Ordering::Relaxed){
@@ -38,17 +49,17 @@ impl Model {
 
 
 
-    fn construct_game_logic(&self, game_objects: Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>>, static_objects : Arc<RwLock<Vec<StaticObject>>>){
+    fn construct_game_logic(&self){
 
         //do logic for creating the game background
     
         let mut rng = thread_rng();
-        if static_objects.read().expect("Could not access static_objects for initialization!").len() > 100{
+        if self.static_objects.read().expect("Could not access static_objects for initialization!").len() > 100{
             print!("something something, more than 100 static objects?!");
         }
     
-        let mut lock = game_objects.write().expect("Could not access game objects for initialization!");
-        for _ in 0..10{
+        let mut lock = self.game_objects.write().expect("Could not access game objects for initialization!");
+        for _ in 0..0{
             let new_debug_object = DebugObject::new((rng.gen_range(-0.5 ..= 0.5), rng.gen_range(-0.5 ..= 0.5)));
     
             lock.push(Box::new(new_debug_object));

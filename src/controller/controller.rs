@@ -2,16 +2,16 @@
 use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}};
 
 use flume::Receiver;
-use winit::event::{VirtualKeyCode, ElementState};
+use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta, TouchPhase};
 
-use crate::{controller::controller_input::MouseInputType, view::renderer::Vertex, model::{game_object::GameObject, model::Model}, drawable_object::static_object::StaticObject};
+use crate::{controller::controller_input::MouseInputType, view::renderer::Vertex, model::{game_object::{GameObject, debug_object::DebugObject}, model::Model}, drawable_object::static_object::StaticObject};
 
 use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, SPACE_BAR}};
 
 use spin_sleep::LoopHelper;
 
 
-type KeyboundFunction = fn(Arc<RwLock<GameState>>);
+type KeyboundFunction = fn(Arc<RwLock<GameState>>, Arc<Model>);
 
 pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<ControllerInput>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
@@ -48,12 +48,12 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
 }
 
 #[allow(dead_code)]
-fn no_action(_game_state: Arc<RwLock<GameState>>){
+fn no_action(_game_state: Arc<RwLock<GameState>>, _model: Arc<Model>){
 
 }
 
 //TODO, execute these actions on correct key press
-fn up_action(game_state: Arc<RwLock<GameState>>){
+fn up_action(game_state: Arc<RwLock<GameState>>, _model: Arc<Model>){
     let mut lock = game_state.write().unwrap();
 
     lock.camera_movement_speed = (lock.camera_movement_speed.0 - 0.5, lock.camera_movement_speed.1);
@@ -89,16 +89,28 @@ fn process_mouse_input(action: MouseInputType, game_state: Arc<RwLock<GameState>
     match action{
         MouseInputType::Move(x, y) => mouse_moved_action(x,y, game_state.clone()),
         MouseInputType::Click { button, state } =>
+        if state == ElementState::Pressed{
             if let Some(func) = keybinds[MOUSE_LEFT] {
-                func(game_state.clone())
-            },
-        MouseInputType::Scroll { delta: _, phase: _ } => (),
+                func(game_state.clone(), model_pointer.clone())
+            }
+        },
+
+        MouseInputType::Scroll { delta, phase : _phase } => process_mouse_scroll(delta, game_state.clone()),
         MouseInputType::EnteredWindow => (),
         MouseInputType::LeftWindow =>(),
     }
 }
 
-fn place_debug_object_action(game_state: Arc<RwLock<GameState>>){}
+fn place_debug_object_action(game_state: Arc<RwLock<GameState>>, model: Arc<Model>){
+
+    let lock = game_state.read().unwrap();
+    let mouse_coords = lock.cursor_pos_ingame;
+    let mut lock = model.game_objects.write().unwrap();
+    let new_object = DebugObject::new(mouse_coords);
+    lock.push(Box::new(new_object));
+
+
+}
 
 fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState, game_state: Arc<RwLock<GameState>>, keybinds: &Vec<Option<KeyboundFunction>>, model_pointer:  Arc<Model>){
     if  let Some(key) = key_input {
@@ -109,15 +121,42 @@ fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState
 }
 
 fn mouse_moved_action(x: f32, y: f32, game_state: Arc<RwLock<GameState>>){
-    let mut lock = game_state.write().expect("Could not save current cursor position to gameState!");
+    let lock = game_state.read().expect("Could not read current gameState in mouse_moved_action!");
+    let screen_center_pos = lock.camera_pos;
+    let half_screen_width = lock.window_dimensions_ingame.0;
+    let half_screen_height = lock.window_dimensions_ingame.1;
+    let mouse_pos = (lock.cursor_pos_relative.0 as f64, lock.cursor_pos_relative.1 as f64);
     let w_len = lock.window_dimensions.0 as f32 / 2.0;
     let h_len = lock.window_dimensions.1 as f32 / 2.0;
-    lock.cursor_pos_relative = ( (x - w_len) / w_len , (y - h_len) / h_len);
-    println!("Cursor moved to {} / {}", lock.cursor_pos_relative.0, lock.cursor_pos_relative.1);
+
+    let c_p_r = ( (x - w_len) / w_len , (y - h_len) / h_len);
+    let c_p_ig = (screen_center_pos.0 + mouse_pos.0* half_screen_width, screen_center_pos.1 + mouse_pos.1 * half_screen_height);
+
+    drop(lock);
+    //spend the least amount of time possible in a write lock
+    let mut lock = game_state.write().expect("Could not save current cursor position to gameState!");
+    lock.cursor_pos_relative = c_p_r;
+    lock.cursor_pos_ingame = c_p_ig ;
+    drop(lock);
+    println!("Cursor moved to {} / {} -> {} / {}" , c_p_r.0, c_p_r.1, c_p_ig.0, c_p_ig.1);
+}
+
+pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: Arc<RwLock<GameState>>){
+
+    match delta {
+        MouseScrollDelta::LineDelta(_horizontal, vertical) => {
+            let mut lock = game_state.write().expect("Could not write to gameState on mouse scroll!");
+            lock.window_dimensions_ingame = (lock.window_dimensions_ingame.0 - vertical as f64*0.1, lock.window_dimensions_ingame.1 - vertical as f64* 0.1);
+            println!("win_dimensions: {:?}", lock.window_dimensions_ingame.0);
+        },
+        MouseScrollDelta::PixelDelta(_) => println!("PixelDeltaMouseInputDetected! Not implemented"),
+    }
+    
+
 }
 
 
-pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<RwLock<Vec<Vertex>>>, game_objects: Arc<RwLock<Vec<Box<dyn GameObject + Send + Sync>>>>, static_objects : Arc<RwLock<Vec<StaticObject>>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
+pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<RwLock<Vec<Vertex>>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
     let mut loop_helper = LoopHelper::builder()
     .report_interval_s(0.5) // report every half a second
@@ -132,13 +171,16 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
 
 
         let mut ret_vector = Vec::new();
-        let camera_pos = game_state.read().unwrap().camera_pos;
-        let lock = game_objects.read().unwrap();
+        let lock = game_state.read().expect("Could not read gameState in communication loop!");
+        let camera_pos = lock.camera_pos;
+        let win_dimensions = lock.window_dimensions_ingame;
+        drop(lock);
+        let lock = model_pointer.game_objects.read().unwrap();
 
-        lock.iter().for_each(|o| o.construct_vertices(camera_pos).into_iter().for_each(|v| ret_vector.push(v)));
+        lock.iter().for_each(|o| o.construct_vertices(camera_pos, win_dimensions).into_iter().for_each(|v| ret_vector.push(v)));
 
         drop(lock);
-        let lock = static_objects.read().unwrap();
+        let lock = model_pointer.static_objects.read().unwrap();
 
         lock.iter().for_each(|o| o.construct_vertices(camera_pos).into_iter().for_each(|v| ret_vector.push(v)));
         drop(lock);        
