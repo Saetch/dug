@@ -189,8 +189,9 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let lock = model_pointer.game_objects.read().unwrap();
-        let mut ret_vector = Vec::with_capacity(lock.len());
-        lock.iter().for_each(|o| o.construct_vertices(camera_pos, win_dimensions).into_iter().for_each(|v| ret_vector.push(v)));
+        let mut ret_vector = Vec::with_capacity(lock.len()*6);
+        lock.iter().map(|o| o.construct_vertices(camera_pos, win_dimensions)).into_iter().for_each(|v| v.into_iter().for_each(|v| ret_vector.push(v)));
+
         drop(lock);
 
         let lock = model_pointer.static_objects.read().unwrap();
