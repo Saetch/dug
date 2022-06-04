@@ -196,7 +196,7 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
 
         let lock = model_pointer.static_objects.read().unwrap();
 
-        lock.iter().for_each(|o| o.construct_vertices(camera_pos).into_iter().for_each(|v| ret_vector.push(v)));
+        lock.iter().map(|o| o.construct_vertices(camera_pos, win_dimensions)).into_iter().for_each(|v| v.into_iter().for_each(|v| ret_vector.push(v)));
         drop(lock);        
 
         *render_sender.write().unwrap() = ret_vector;
