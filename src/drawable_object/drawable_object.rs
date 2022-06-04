@@ -1,6 +1,6 @@
 use crate::view::renderer::Vertex;
 
-pub trait DrawableObject {
+pub trait DrawableObject:{
     /**
      * Default implementation for a somewhat rectangle-shaped object
      */
@@ -45,6 +45,7 @@ pub trait DrawableObject {
             
         ]
     }
+
 
 
     fn get_position(&self) -> (f64, f64);

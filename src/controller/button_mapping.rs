@@ -16,13 +16,13 @@ pub(crate) fn load_default_keybinds() -> Vec<(Option<KeyboundFunction>, Option<K
     
     // Keydown , Keyup
     let fn_pointer: KeyboundFunction = camera_up_action;
-    ret[W_BUTTON] = (None, Some(fn_pointer));
+    ret[W_BUTTON] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = camera_right_action;
-    ret[D_BUTTON] = (None, Some(fn_pointer));
+    ret[D_BUTTON] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = camera_down_action;
-    ret[S_BUTTON] = (None, Some(fn_pointer));
+    ret[S_BUTTON] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = camera_left_action;
-    ret[A_BUTTON] = (None, Some(fn_pointer));
+    ret[A_BUTTON] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = place_debug_object_action;
     ret[MOUSE_LEFT] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = no_action;
@@ -32,13 +32,13 @@ pub(crate) fn load_default_keybinds() -> Vec<(Option<KeyboundFunction>, Option<K
     let fn_pointer: KeyboundFunction = half_screen_width_ingame_regular;
     ret[SPACE_BAR] = (None, Some(fn_pointer));
     let fn_pointer: KeyboundFunction = simulate_mouse_wheel_up;
-    ret[J_BUTTON] = (None, Some(fn_pointer));
+    ret[J_BUTTON] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = simulate_mouse_wheel_down;
-    ret[L_BUTTON] = (None, Some(fn_pointer));
+    ret[L_BUTTON] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = half_screen_width_ingame_point5times;
-    ret[I_BUTTON] = (None, Some(fn_pointer));
+    ret[I_BUTTON] = (Some(fn_pointer), None);
     let fn_pointer: KeyboundFunction = half_screen_width_ingame_2times;
-    ret[O_BUTTON] = (None, Some(fn_pointer));
+    ret[O_BUTTON] = (Some(fn_pointer), None);
 
 
 

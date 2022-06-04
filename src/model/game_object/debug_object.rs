@@ -14,6 +14,12 @@ impl DebugObject{
     pub fn new(position: (f64, f64)) -> Self{
         DebugObject { position, tex_i: 0, size: 0.4 }
     }
+    #[allow(dead_code)]
+    fn copy(&self)-> Box<dyn DrawableObject> {
+        Box::new(DebugObject{
+            ..(*self)
+        })
+    }
 }
 
 impl GameObject for DebugObject {}
@@ -52,4 +58,7 @@ impl DrawableObject for DebugObject {
     }
 
 
+
+
 }
+

@@ -4,7 +4,7 @@ use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}};
 use flume::Receiver;
 use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta};
 
-use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{GameObject, debug_object::DebugObject}, model::Model}, drawable_object::static_object::StaticObject};
+use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{GameObject, debug_object::DebugObject}, model::Model}, drawable_object::{static_object::StaticObject, drawable_object::DrawableObject}};
 
 use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, SPACE_BAR}};
 
@@ -175,27 +175,24 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
 
     let mut loop_helper = LoopHelper::builder()
     .report_interval_s(0.5) // report every half a second
-    .build_with_target_rate(69.0); // limit to 90 FPS if possible
+    .build_with_target_rate(250.0); // limit to 90 FPS if possible
 
 
-    let mut current_fps = None;
 
     while running.load(atomic::Ordering::Relaxed){
         let _delta = loop_helper.loop_start(); // or .loop_start_s() for f64 seconds
 
 
-
-        let mut ret_vector = Vec::new();
         let lock = game_state.read().expect("Could not read gameState in communication loop!");
         let camera_pos = lock.camera_pos;
         let cam_speed = lock.camera_movement_speed;
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let lock = model_pointer.game_objects.read().unwrap();
-
+        let mut ret_vector = Vec::with_capacity(lock.len());
         lock.iter().for_each(|o| o.construct_vertices(camera_pos, win_dimensions).into_iter().for_each(|v| ret_vector.push(v)));
-
         drop(lock);
+
         let lock = model_pointer.static_objects.read().unwrap();
 
         lock.iter().for_each(|o| o.construct_vertices(camera_pos).into_iter().for_each(|v| ret_vector.push(v)));
@@ -206,8 +203,11 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
         
 
         if let Some(fps) = loop_helper.report_rate() {
-            current_fps = Some(fps);
+            println!("FPS Vertex_construction: {}", fps);
         }
+
+    
+
 
 
 

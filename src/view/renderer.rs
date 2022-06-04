@@ -90,7 +90,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     // that, we store the submission of the previous frame here.
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
-
+    
     let mut last_change = SystemTime::now();
     let _vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
     surface.window().set_visible(true);
@@ -191,6 +191,14 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 }
 
 
+                let mut vertices  = render_receiver.read().unwrap().to_vec();                
+
+
+                if vertices.len() == 0{
+                    vertices = Vec::new();
+                    vertices.push(Vertex { position: [1.5, 2.0], tex_i: 0, coords: [2.0, 2.0] });
+                }
+
                 // It is important to call this function from time to time, otherwise resources will keep
                 // accumulating and you will eventually reach an out of memory error.
                 // Calling this function polls various fences in order to determine what the GPU has
@@ -223,14 +231,6 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                         &mut viewport,
                     );
                     recreate_swapchain = false;
-                }
-
-                let mut vertices  = render_receiver.read().unwrap().to_vec();                
-
-
-                if vertices.len() == 0{
-                    vertices = Vec::new();
-                    vertices.push(Vertex { position: [1.5, 2.0], tex_i: 0, coords: [2.0, 2.0] });
                 }
 
                 //safe the current state in the vertex_buffer for drawing
@@ -356,13 +356,13 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
                 
 
-
+                /*
                 let now_time = SystemTime::now();
                 let _time_diff = now_time.duration_since(last_change);
                 last_change = SystemTime::now();
 
-                //println!("{:?}", time_diff);
-                
+                println!("{:?}", _time_diff);
+                */
                 
             }
             _ => (),
