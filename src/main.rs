@@ -1,8 +1,8 @@
 use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, RwLock}};
 use constants::{WINDOW_INIT_X, WINDOW_INIT_Y};
 use controller::{controller_input::ControllerInput, controller::handle_communication_loop, game_state::GameState};
-use drawable_object::static_object::StaticObject;
-use model::{model::{ Model}, game_object::GameObject};
+
+use model::{model::{ Model}};
 use view::renderer::Vertex;
 use crate::{view::renderer::vulkano_render, controller::controller::handle_input_loop};
 

@@ -4,9 +4,9 @@ use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}};
 use flume::Receiver;
 use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta};
 
-use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{GameObject, debug_object::DebugObject}, model::Model}, drawable_object::{static_object::StaticObject, drawable_object::DrawableObject}};
+use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{debug_object::DebugObject}, model::Model}, drawable_object::{drawable_object::DrawableObject}};
 
-use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{W_BUTTON, D_BUTTON, S_BUTTON, A_BUTTON, MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, SPACE_BAR}};
+use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{MOUSE_LEFT}};
 
 use spin_sleep::LoopHelper;
 
@@ -16,7 +16,7 @@ pub(crate) type KeyboundFunction = fn(&Arc<RwLock<GameState>>, &Arc<Model>);
 pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<ControllerInput>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
 
-    let mut keybinds = load_default_keybinds();
+    let keybinds = load_default_keybinds();
 
 
     while thread_running.load(atomic::Ordering::Relaxed){
@@ -52,23 +52,23 @@ pub(crate) fn no_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model
 
 }
 
-pub(crate) fn up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+pub(crate) fn up_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     todo!();
 }
 
-pub(crate) fn camera_down_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+pub(crate) fn camera_down_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     todo!();
 }
 
-pub(crate) fn camera_up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+pub(crate) fn camera_up_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     todo!();
 }
 
-pub(crate) fn camera_right_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+pub(crate) fn camera_right_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     todo!();
 }
 
-pub(crate) fn camera_left_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+pub(crate) fn camera_left_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     todo!();
 }
 
@@ -92,7 +92,7 @@ pub(crate) fn half_screen_width_ingame_point5times(game_state: &Arc<RwLock<GameS
 fn process_mouse_input(action: MouseInputType, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<(Option<KeyboundFunction>, Option<KeyboundFunction>)>, model_pointer:  &Arc<Model>){
     match action{
         MouseInputType::Move(x, y) => mouse_moved_action(x,y, game_state),
-        MouseInputType::Click { button, state } =>
+        MouseInputType::Click { button: _, state } =>
         if state == ElementState::Pressed{
             //.0 for keydown action. TODO: Implement correct behavior that distinguishes between keyup, keydown
             if let Some(func) = keybinds[MOUSE_LEFT].0 {
@@ -185,7 +185,7 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<Rw
 
         let lock = game_state.read().expect("Could not read gameState in communication loop!");
         let camera_pos = lock.camera_pos;
-        let cam_speed = lock.camera_movement_speed;
+        let _cam_speed = lock.camera_movement_speed;
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let lock = model_pointer.game_objects.read().unwrap();

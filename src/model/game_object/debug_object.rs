@@ -1,5 +1,5 @@
 
-use crate::{drawable_object::drawable_object::DrawableObject, view::renderer::Vertex};
+use crate::{drawable_object::drawable_object::DrawableObject};
 
 use super::{GameObject, LogicObject};
 

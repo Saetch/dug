@@ -91,7 +91,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
     
-    let mut last_change = SystemTime::now();
+    let _last_change = SystemTime::now();
     let _vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
     surface.window().set_visible(true);
     

@@ -1,6 +1,6 @@
 use std::{sync::{atomic::{AtomicBool, self}, Arc, RwLock}, time::Duration, thread::sleep};
 
-use rand::{thread_rng, Rng};
+use rand::{thread_rng};
 
 use crate::{ model::game_object::{ GameObject}, drawable_object::static_object::{StaticObject}};
 
@@ -54,7 +54,7 @@ impl Model {
 
         //do logic for creating the game background
     
-        let mut rng = thread_rng();
+        let _rng = thread_rng();
         if self.static_objects.read().expect("Could not access static_objects for initialization!").len() > 100{
             print!("something something, more than 100 static objects?!");
         }
