@@ -1,5 +1,6 @@
 use bytemuck::{Pod, Zeroable};
-use flume::{Sender};
+use flume::{Sender, Receiver, r#async};
+use spin_sleep::LoopHelper;
 
 use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
@@ -46,14 +47,12 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
 
     
 
-pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, render_receiver: Arc<RwLock<Vec<Vertex>>>) {
-    
+pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, render_receiver: Arc<RwLock<Vec<Vertex>>>) {
     let mut ctr_sender = Some(controller_s);
     let (device, queue, pipeline, images, render_pass, event_loop
     , surface,mut swapchain, descriptor_set)
      = init();
     
-
     // Dynamic viewports allow us to recreate just the viewport when the window is resized
     // Otherwise we would have to recreate the whole pipeline.
     let mut viewport = Viewport {
@@ -94,7 +93,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     let _last_change = SystemTime::now();
     let _vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
     surface.window().set_visible(true);
-    
+
     //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -106,9 +105,11 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 running.store(false, std::sync::atomic::Ordering::SeqCst);
                 //dropping the sender will result in an Err Result on the controller thread recv() method
                 ctr_sender = None;
+                vertex_receiver.recv().unwrap();            //make the sender thread complete one more loop, in order to make it realize the running bool was set to false
                 while let Some(cur_thread) = threads_vec.pop() {
                     cur_thread.join().unwrap();
                 }
+                
                 *control_flow = ControlFlow::Exit;
 
 
@@ -183,6 +184,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             Event::RedrawEventsCleared => {
 
 
+
+
                 // Do not draw frame when screen dimensions are zero.
                 // On Windows, this can occur from minimizing the application.
                 let dimensions = surface.window().inner_size();
@@ -191,20 +194,15 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 }
 
 
-                let mut vertices  = render_receiver.read().unwrap().to_vec();                
-
-
-                if vertices.len() == 0{
-                    vertices = Vec::new();
-                    vertices.push(Vertex { position: [1.5, 2.0], tex_i: 0, coords: [2.0, 2.0] });
-                }
-
                 // It is important to call this function from time to time, otherwise resources will keep
                 // accumulating and you will eventually reach an out of memory error.
                 // Calling this function polls various fences in order to determine what the GPU has
                 // already processed, and frees the resources that are no longer needed.
                 previous_frame_end.as_mut().unwrap().cleanup_finished();
 
+
+
+                //println!("VP0: {}", vertices[0].position[0]);
                 // Whenever the window resizes we need to recreate everything dependent on the window size.
                 // In this example that includes the swapchain, the framebuffers and the dynamic state viewport.
                 if recreate_swapchain {
@@ -233,9 +231,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     recreate_swapchain = false;
                 }
 
-                //safe the current state in the vertex_buffer for drawing
-                let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter())
-                .unwrap();
+               
+
 
                 // Before we can draw on the output, we have to *acquire* an image from the swapchain. If
                 // no image is available (which happens if you submit draw commands too quickly), then the
@@ -260,7 +257,25 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 if suboptimal {
                     recreate_swapchain = true;
                 }
+                let mut vertices: Vec<Vertex>;
+                    vertices = vertex_receiver.recv().expect("Received Error message from vertex sender!");
+                
 
+                if vertices.len() == 0{
+                    vertices = Vec::new();
+                    //vertices.push(Vertex{..Default::default()});
+                    vertices.push(Vertex{
+                        ..Default::default()
+                    });
+                }
+
+                
+                //let vertices = vertices_future.await.unwrap();
+                
+                
+                //safe the current state in the vertex_buffer for drawing
+                let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
+                .unwrap();
                 // In order to draw, we have to build a *command buffer*. The command buffer object holds
                 // the list of commands that are going to be executed.
                 //
@@ -348,6 +363,13 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                         previous_frame_end = Some(sync::now(device.clone()).boxed());
                     }
                 }
+
+
+            
+
+
+
+
             }
             //this Event gets submitted 60 times per second, due to vulkan restricting rendering to once per ~16.4-16.5 ms.
             //this can be called way more if running on a different thread and thus (and because of hardware limitations aswell),

@@ -18,16 +18,17 @@ fn main(){
 
     let (threads_vec,
         controller_sender,
+        vertex_receiver,
         render_receiver,
          running)
           = start_threads();
     //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
     //otherwise it will lead to cross-platform compatibility problems
-    vulkano_render(threads_vec, running, controller_sender, render_receiver);
+    vulkano_render(threads_vec, running, controller_sender, vertex_receiver, render_receiver);
 }
 
 
-fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<RwLock<Vec<Vertex>>>, Arc<AtomicBool>){
+fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, flume::Receiver<Vec<Vertex>>, Arc<RwLock<Vec<Vertex>>>, Arc<AtomicBool>){
 
     let running = Arc::new(AtomicBool::new(true));
 
@@ -67,14 +68,13 @@ fn start_threads()-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInput>, Arc<R
     let render_receiver = Arc::new(RwLock::new(Vec::new()));
     let render_sender = render_receiver.clone();
 
-
-
+    let (vertex_sender, vertex_receiver) = flume::bounded::<Vec<Vertex>>(1);
     let controller_communication_thread = thread::spawn(move ||{
-        handle_communication_loop(thread_running, render_sender, thread_game_state, thread_mod);
+        handle_communication_loop(thread_running, vertex_sender, render_sender, thread_game_state, thread_mod);
     });
 
 
-    return (vec![model_thread, controller_thread, controller_communication_thread], sender, render_receiver, running);
+    return (vec![model_thread, controller_thread, controller_communication_thread], sender, vertex_receiver, render_receiver, running);
 }
 
 /**

@@ -1,12 +1,12 @@
 
-use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}};
+use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}, time::SystemTime};
 
-use flume::Receiver;
+use flume::{Receiver, Sender};
 use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta};
 
 use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{debug_object::DebugObject}, model::Model}, drawable_object::{drawable_object::DrawableObject}};
 
-use super::{controller_input::ControllerInput, game_state::GameState, button_constants::{MOUSE_LEFT}};
+use super::{controller_input::ControllerInput, game_state::{GameState, CamKeyPressed}, button_constants::{MOUSE_LEFT}};
 
 use spin_sleep::LoopHelper;
 
@@ -56,20 +56,84 @@ pub(crate) fn up_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model
     todo!();
 }
 
-pub(crate) fn camera_down_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
-    todo!();
+pub(crate) fn camera_down_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_down_action");
+    match lock.camera_movement.1 {
+        CamKeyPressed::Positive => (),
+        CamKeyPressed::Negative => lock.camera_movement.1 = CamKeyPressed::Both,
+        CamKeyPressed::None => lock.camera_movement.1 = CamKeyPressed::Positive,
+        CamKeyPressed::Both => (),
+    }
 }
 
-pub(crate) fn camera_up_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
-    todo!();
+pub(crate) fn camera_up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_up_action");
+    match lock.camera_movement.1 {
+        CamKeyPressed::Positive => lock.camera_movement.1 = CamKeyPressed::Both,
+        CamKeyPressed::Negative => (),
+        CamKeyPressed::None => lock.camera_movement.1 = CamKeyPressed::Negative,
+        CamKeyPressed::Both => (),
+    }
 }
 
-pub(crate) fn camera_right_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
-    todo!();
+pub(crate) fn camera_right_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_right_action");
+    match lock.camera_movement.0 {
+        CamKeyPressed::Positive => (),
+        CamKeyPressed::Negative => lock.camera_movement.0 = CamKeyPressed::Both,
+        CamKeyPressed::None => lock.camera_movement.0 = CamKeyPressed::Positive,
+        CamKeyPressed::Both => (),
+    }
 }
 
-pub(crate) fn camera_left_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
-    todo!();
+pub(crate) fn camera_left_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_left_action");
+    match lock.camera_movement.0 {
+        CamKeyPressed::Positive => lock.camera_movement.0 = CamKeyPressed::Both,
+        CamKeyPressed::Negative => (),
+        CamKeyPressed::None => lock.camera_movement.0 = CamKeyPressed::Negative,
+        CamKeyPressed::Both => (),
+    }
+}
+
+pub(crate) fn camera_down_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_down_action_released");
+    match lock.camera_movement.1 {
+        CamKeyPressed::Positive => lock.camera_movement.1 = CamKeyPressed::None,
+        CamKeyPressed::Negative => (),
+        CamKeyPressed::None => (),
+        CamKeyPressed::Both => lock.camera_movement.1 = CamKeyPressed::Negative,
+    }
+}
+
+pub(crate) fn camera_up_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_up_action_released");
+    match lock.camera_movement.1 {
+        CamKeyPressed::Positive => (),
+        CamKeyPressed::Negative => lock.camera_movement.1 = CamKeyPressed::None,
+        CamKeyPressed::None => (),
+        CamKeyPressed::Both => lock.camera_movement.1 = CamKeyPressed::Positive,
+    }
+}
+
+pub(crate) fn camera_right_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_right_action_released");
+    match lock.camera_movement.0 {
+        CamKeyPressed::Positive => lock.camera_movement.0 = CamKeyPressed::None,
+        CamKeyPressed::Negative => (),
+        CamKeyPressed::None => (),
+        CamKeyPressed::Both => lock.camera_movement.0 = CamKeyPressed::Negative,
+    }
+}
+
+pub(crate) fn camera_left_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
+    let mut lock = game_state.write().expect("Could not write to gameState in camera_left_action_released");
+    match lock.camera_movement.0 {
+        CamKeyPressed::Positive => (),
+        CamKeyPressed::Negative => lock.camera_movement.0 = CamKeyPressed::None,
+        CamKeyPressed::None => (),
+        CamKeyPressed::Both => lock.camera_movement.0 = CamKeyPressed::Positive,
+    }
 }
 
 
@@ -156,6 +220,20 @@ fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
     println!("Cursor moved to {} / {} -> {} / {}" , c_p_r.0, c_p_r.1, c_p_ig.0, c_p_ig.1);
 }
 
+/**
+ * similiar to mouse_moved_action, except the mouse didn't move and the recalculating is needed because the zoom level changed
+ */
+fn recalculate_mouse_pos(game_state: &Arc<RwLock<GameState>>){
+    let lock = game_state.read().expect("Could not read current gameState in recalculate_mouse_pos!");
+    let screen_center_pos = lock.camera_pos;
+    let half_screen_width = lock.window_dimensions_ingame.0;
+    let half_screen_height = lock.window_dimensions_ingame.1;
+    let mouse_pos = (lock.cursor_pos_relative.0 as f64, lock.cursor_pos_relative.1 as f64);
+    drop(lock);
+    let mut lock = game_state.write().expect("Could not save recalculated cursor position!");
+    lock.cursor_pos_ingame = (screen_center_pos.0 +half_screen_width*mouse_pos.0, screen_center_pos.1 + half_screen_height*mouse_pos.1);
+}
+
 //process mouse_wheel
 pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<GameState>>){
 
@@ -163,52 +241,65 @@ pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<Gam
         MouseScrollDelta::LineDelta(_horizontal, vertical) => {
             let mut lock = game_state.write().expect("Could not write to gameState on mouse scroll!");
             lock.window_dimensions_ingame = (lock.window_dimensions_ingame.0 - vertical as f64*0.1, lock.window_dimensions_ingame.1 - vertical as f64* 0.1);
+            drop(lock); //could have given ownership to recalculate_mouse_pos instead and thus circumvented another read->write access, but this type of performance optimization should not be necessary
+            recalculate_mouse_pos(game_state);
         },
         MouseScrollDelta::PixelDelta(_) => println!("PixelDeltaMouseInputDetected! Not implemented"),
     }
+
+    
     
 
 }
 
 
-pub fn handle_communication_loop(running: Arc<AtomicBool>, render_sender: Arc<RwLock<Vec<Vertex>>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
-
-    let mut loop_helper = LoopHelper::builder()
-    .report_interval_s(0.5) // report every half a second
-    .build_with_target_rate(250.0); // limit to 90 FPS if possible
+pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender<Vec<Vertex>>, render_sender: Arc<RwLock<Vec<Vertex>>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
 
+    let mut now: SystemTime;
+    let mut last_executed = SystemTime::now();
 
     while running.load(atomic::Ordering::Relaxed){
-        let _delta = loop_helper.loop_start(); // or .loop_start_s() for f64 seconds
+        now = SystemTime::now();
 
+        let delta = now.duration_since(last_executed).unwrap().as_secs_f64();
+        last_executed = SystemTime::now();
 
         let lock = game_state.read().expect("Could not read gameState in communication loop!");
+        let speed = lock.cam_speed as f64;
+        let cam_mov:(f64, f64) = (match &lock.camera_movement.0 {
+            CamKeyPressed::Positive => 1.0,
+            CamKeyPressed::Negative => -1.0,
+            CamKeyPressed::None => 0.0,
+            CamKeyPressed::Both => 0.0,
+        }, match &lock.camera_movement.1 {
+            CamKeyPressed::Positive => 1.0,
+            CamKeyPressed::Negative => -1.0,
+            CamKeyPressed::None => 0.0,
+            CamKeyPressed::Both => 0.0,
+        });
         let camera_pos = lock.camera_pos;
-        let _cam_speed = lock.camera_movement_speed;
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
+        let new_cam_pos = (cam_mov.0 * speed *win_dimensions.0 *delta + camera_pos.0, cam_mov.1 * speed* win_dimensions.1 * delta + camera_pos.1);
         let lock = model_pointer.game_objects.read().unwrap();
-        let mut ret_vector:Vec<Vertex> = lock.iter().map(|o| o.construct_vertices(camera_pos, win_dimensions)).into_iter().flatten().collect();
+        let mut ret_vector:Vec<Vertex> = lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten().collect();
 
         drop(lock);
         let lock = model_pointer.static_objects.read().unwrap();
-        ret_vector.extend(&mut (lock.iter().map(|o| o.construct_vertices(camera_pos, win_dimensions)).into_iter().flatten())); 
+        ret_vector.extend(&mut (lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten())); 
         drop(lock);        
-        *render_sender.write().unwrap() = ret_vector;
-        
-        
-
-        if let Some(fps) = loop_helper.report_rate() {
-            println!("FPS Vertex_construction: {}", fps);
+        match vertex_sender.send(ret_vector){
+            Ok(_) => (),
+            Err(e) => println!("{:?}", e),
         }
-
-    
-
+        game_state.write().unwrap().camera_pos = new_cam_pos;
 
 
 
-        loop_helper.loop_sleep();
+
+
+
     }
 
     println!("Gracefully stopping the communications thread");

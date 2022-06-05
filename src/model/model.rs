@@ -49,10 +49,11 @@ impl Model {
     }
 
 
-
+/**
+ * logic for creating the game background and needed objects
+ */
     fn construct_game_logic(&self){
 
-        //do logic for creating the game background
     
         let _rng = thread_rng();
         if self.static_objects.read().expect("Could not access static_objects for initialization!").len() > 100{
@@ -60,7 +61,7 @@ impl Model {
         }
     
         let mut lock = self.game_objects.write().expect("Could not access game objects for initialization!");
-        for i in 0..100_000{
+        for i in 0..0{
             let new_debug_object = DebugObject::new((i as f64 *0.4, 0.0));
     
             lock.push(Box::new(new_debug_object));
