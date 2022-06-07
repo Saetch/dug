@@ -1,11 +1,9 @@
 use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, RwLock}};
 use constants::{WINDOW_INIT_X, WINDOW_INIT_Y};
 use controller::{controller_input::ControllerInput, controller::handle_communication_loop, game_state::GameState};
-
 use model::{model::{ Model}};
 use view::renderer::Vertex;
 use crate::{view::renderer::vulkano_render, controller::controller::handle_input_loop};
-
 mod controller;
 mod view;
 mod drawable_object;
@@ -13,8 +11,7 @@ mod constants;
 mod model;
 
 fn main(){
-    
-
+    let rt = tokio::runtime::Runtime::new().unwrap();
 
     let (threads_vec,
         controller_sender,
@@ -24,7 +21,8 @@ fn main(){
           = start_threads();
     //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
     //otherwise it will lead to cross-platform compatibility problems
-    vulkano_render(threads_vec, running, controller_sender, vertex_receiver, render_receiver);
+   rt.block_on(vulkano_render(threads_vec, running, controller_sender, vertex_receiver, &rt));
+    
 }
 
 

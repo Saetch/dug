@@ -1,6 +1,8 @@
+
 use bytemuck::{Pod, Zeroable};
 use flume::{Sender, Receiver, r#async};
 use spin_sleep::LoopHelper;
+use tokio::runtime::Runtime;
 
 use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
 use vulkano::{
@@ -47,7 +49,7 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
 
     
 
-pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, render_receiver: Arc<RwLock<Vec<Vertex>>>) {
+pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: &Runtime) {
     let mut ctr_sender = Some(controller_s);
     let (device, queue, pipeline, images, render_pass, event_loop
     , surface,mut swapchain, descriptor_set)
