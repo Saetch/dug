@@ -2,6 +2,7 @@
 use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}, time::SystemTime};
 
 use flume::{Receiver, Sender};
+use tokio::sync::{oneshot::Sender as AsyncSender, Mutex};
 use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta};
 
 use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{debug_object::DebugObject}, model::Model}, drawable_object::{drawable_object::DrawableObject}};
@@ -253,8 +254,7 @@ pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<Gam
 }
 
 
-pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender<Vec<Vertex>>, render_sender: Arc<RwLock<Vec<Vertex>>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
-
+pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender<Vec<Vertex>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
     let mut now: SystemTime;
     let mut last_executed = SystemTime::now();
@@ -288,7 +288,8 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender
         drop(lock);
         let lock = model_pointer.static_objects.read().unwrap();
         ret_vector.extend(&mut (lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten())); 
-        drop(lock);        
+        drop(lock);    
+        
         match vertex_sender.send(ret_vector){
             Ok(_) => (),
             Err(e) => println!("{:?}", e),

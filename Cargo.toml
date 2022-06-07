@@ -23,6 +23,7 @@ pollster = "0.2.5"      #can poll stuff, wait for async returns in synchronous c
 spin_sleep = "1.1.1"
 tokio = { version = "1.*", features = ["full"] }
 futures = "0.*"
+lazy_static = "*"
 
 
 

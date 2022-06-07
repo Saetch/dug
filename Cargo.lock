@@ -392,6 +392,7 @@ dependencies = [
  "env_logger",
  "flume",
  "futures",
+ "lazy_static",
  "log",
  "png",
  "pollster",

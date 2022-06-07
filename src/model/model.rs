@@ -61,7 +61,7 @@ impl Model {
         }
     
         let mut lock = self.game_objects.write().expect("Could not access game objects for initialization!");
-        for i in 0..0{
+        for i in 0..550{
             let new_debug_object = DebugObject::new((i as f64 *0.4, 0.0));
     
             lock.push(Box::new(new_debug_object));

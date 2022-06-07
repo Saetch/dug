@@ -2,9 +2,9 @@
 use bytemuck::{Pod, Zeroable};
 use flume::{Sender, Receiver, r#async};
 use spin_sleep::LoopHelper;
-use tokio::runtime::Runtime;
+use tokio::{runtime::{Runtime, Handle}, join, sync::{oneshot::Receiver as AsyncReceiver, Mutex}};
 
-use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime};
+use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime, cell::RefCell, rc::Rc};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
@@ -49,12 +49,11 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
 
     
 
-pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: &Runtime) {
+pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: Handle) {
     let mut ctr_sender = Some(controller_s);
     let (device, queue, pipeline, images, render_pass, event_loop
     , surface,mut swapchain, descriptor_set)
      = init();
-    
     // Dynamic viewports allow us to recreate just the viewport when the window is resized
     // Otherwise we would have to recreate the whole pipeline.
     let mut viewport = Viewport {
@@ -95,7 +94,12 @@ pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, runnin
     let _last_change = SystemTime::now();
     let _vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
     surface.window().set_visible(true);
+    
 
+    let mut loop_helper = LoopHelper::builder()
+    .report_interval_s(0.01) // report every half a second
+    .build_with_target_rate(60.0); // limit to 250 FPS if possible
+    let mut current_fps = None;
     //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -107,7 +111,9 @@ pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, runnin
                 running.store(false, std::sync::atomic::Ordering::SeqCst);
                 //dropping the sender will result in an Err Result on the controller thread recv() method
                 ctr_sender = None;
-                vertex_receiver.recv().unwrap();            //make the sender thread complete one more loop, in order to make it realize the running bool was set to false
+                    (vertex_receiver).recv().unwrap();   //make the sender thread complete one more loop, in order to make it realize the running bool was set to false
+
+                
                 while let Some(cur_thread) = threads_vec.pop() {
                     cur_thread.join().unwrap();
                 }
@@ -184,11 +190,33 @@ pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, runnin
                 }
             }
             Event::RedrawEventsCleared => {
+                let _delta = loop_helper.loop_start(); // or .loop_start_s() for f64 seconds
+                rt.block_on( async {
 
 
+                let (vertex_buffer, _) = join!(async{                
+                    let start = SystemTime::now();
+                    let mut vertices = vertex_receiver.recv_async().await.expect("Received Error while trying to read from vertex sender!");
 
-
-                // Do not draw frame when screen dimensions are zero.
+                    let end = SystemTime::now();
+                    if vertices.len() == 0{
+                        vertices = Vec::new();
+                        //vertices.push(Vertex{..Default::default()});
+                        vertices.push(Vertex{
+                            ..Default::default()
+                        });
+                    }
+    
+                    
+                    //let vertices = vertices_future.await.unwrap();
+                    
+                    
+                    //safe the current state in the vertex_buffer for drawing
+                    let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
+                    .unwrap();
+                vertex_buffer
+            }, async{
+                                // Do not draw frame when screen dimensions are zero.
                 // On Windows, this can occur from minimizing the application.
                 let dimensions = surface.window().inner_size();
                 if dimensions.width == 0 || dimensions.height == 0 {
@@ -232,6 +260,9 @@ pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, runnin
                     );
                     recreate_swapchain = false;
                 }
+            });
+
+
 
                
 
@@ -259,25 +290,8 @@ pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, runnin
                 if suboptimal {
                     recreate_swapchain = true;
                 }
-                let mut vertices: Vec<Vertex>;
-                    vertices = vertex_receiver.recv().expect("Received Error message from vertex sender!");
-                
 
-                if vertices.len() == 0{
-                    vertices = Vec::new();
-                    //vertices.push(Vertex{..Default::default()});
-                    vertices.push(Vertex{
-                        ..Default::default()
-                    });
-                }
 
-                
-                //let vertices = vertices_future.await.unwrap();
-                
-                
-                //safe the current state in the vertex_buffer for drawing
-                let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
-                .unwrap();
                 // In order to draw, we have to build a *command buffer*. The command buffer object holds
                 // the list of commands that are going to be executed.
                 //
@@ -293,6 +307,7 @@ pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, runnin
                     CommandBufferUsage::MultipleSubmit,      //oneTimeSubmit is more optimized and applicable, since we create a new one every frame
                 )
                 .unwrap();
+
 
                 builder
                     // Before we can draw, we have to *enter a render pass*.
@@ -367,9 +382,14 @@ pub(crate) async fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, runnin
                 }
 
 
-            
+                if let Some(fps) = loop_helper.report_rate() {
+                    current_fps = Some(fps.round());
+                    //println!("{} FPS", fps);
+                }
 
+                loop_helper.loop_sleep(); // sleeps to achieve a 250 FPS rate
 
+            });
 
 
             }
