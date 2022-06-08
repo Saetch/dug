@@ -218,7 +218,6 @@ fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
     lock.cursor_pos_relative = c_p_r;
     lock.cursor_pos_ingame = c_p_ig ;
     drop(lock);
-    println!("Cursor moved to {} / {} -> {} / {}" , c_p_r.0, c_p_r.1, c_p_ig.0, c_p_ig.1);
 }
 
 /**
@@ -256,15 +255,14 @@ pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<Gam
 
 pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender<Vec<Vertex>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
-    let mut now: SystemTime;
-    let mut last_executed = SystemTime::now();
-
+   
+    let mut loop_helper = LoopHelper::builder()
+    .report_interval_s(1.0) // report every half a second
+    .build_with_target_rate(102.0); // limit to FPS if possible
+    let mut current_fps = None;
+    let mut delta: f64 = 0.0;
     while running.load(atomic::Ordering::Relaxed){
-        now = SystemTime::now();
-
-        let delta = now.duration_since(last_executed).unwrap().as_secs_f64();
-        last_executed = SystemTime::now();
-
+        //let delta = now.duration_since(last_executed).unwrap().as_secs_f64();
         let lock = game_state.read().expect("Could not read gameState in communication loop!");
         let speed = lock.cam_speed as f64;
         let cam_mov:(f64, f64) = (match &lock.camera_movement.0 {
@@ -281,7 +279,7 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender
         let camera_pos = lock.camera_pos;
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
-        let new_cam_pos = (cam_mov.0 * speed *win_dimensions.0 *delta + camera_pos.0, cam_mov.1 * speed* win_dimensions.1 * delta + camera_pos.1);
+        let new_cam_pos = (cam_mov.0 * speed *win_dimensions.0 * delta + camera_pos.0, cam_mov.1 * speed* win_dimensions.1 *  delta + camera_pos.1);
         let lock = model_pointer.game_objects.read().unwrap();
         let mut ret_vector:Vec<Vertex> = lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten().collect();
 
@@ -294,7 +292,16 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender
             Ok(_) => (),
             Err(e) => println!("{:?}", e),
         }
+        if let Some(fps) = loop_helper.report_rate() {
+            current_fps = Some(fps);
+            println!("FPS: {:?}", current_fps);
+
+        }
+
+        loop_helper.loop_sleep(); // sleeps to acheive a 250 FPS rate
+
         game_state.write().unwrap().camera_pos = new_cam_pos;
+        delta = loop_helper.loop_start_s(); // or .loop_start_s() for f64 seconds
 
 
 

@@ -18,7 +18,7 @@ use vulkano::{
     },
     render_pass::{  RenderPass},
     swapchain::{
-         Surface, Swapchain, SwapchainCreateInfo,
+         Surface, Swapchain, SwapchainCreateInfo, PresentMode,
     },
 
 };
@@ -68,6 +68,8 @@ let instance = Instance::new(InstanceCreateInfo {
     ..Default::default()
 })
 .unwrap();
+
+PhysicalDevice::enumerate(&instance).for_each(|p| println!("device: {} type: {:?} attr: {}", p.properties().device_name, p.properties().device_type, p.properties().max_vertex_input_attributes));
 
 // create the window.
 //
@@ -248,7 +250,7 @@ let (swapchain, images) = {
                 .iter()
                 .next()
                 .unwrap(),
-
+            present_mode: PresentMode::Mailbox,
             ..Default::default()
         },
     )

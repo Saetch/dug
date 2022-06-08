@@ -52,7 +52,6 @@ pub(crate) fn load_default_keybinds() -> Vec<(Option<KeyboundFunction>, Option<K
 
 
 pub(crate) fn key_action_pressed(key: VirtualKeyCode, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<(Option<KeyboundFunction>, Option<KeyboundFunction>)>, model: &Arc<Model>){
-    println!("Key action pressed: {:?}", key);
     match key {
         VirtualKeyCode::Key1 => (),
         VirtualKeyCode::Key2 => (),
