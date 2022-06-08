@@ -250,7 +250,7 @@ let (swapchain, images) = {
                 .iter()
                 .next()
                 .unwrap(),
-            present_mode: PresentMode::Mailbox,
+            present_mode: PresentMode::Immediate,
             ..Default::default()
         },
     )
