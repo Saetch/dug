@@ -93,6 +93,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     
     surface.window().set_visible(true);
 
+    let mut old_call = SystemTime::now();
+
 
     //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
     event_loop.run(move |event, _, control_flow| {
@@ -184,9 +186,12 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             }
             Event::RedrawEventsCleared => {
                 
-                
 
-                                
+                    let now_call= SystemTime::now();
+
+                    //println!("Time dif: {}", now_call.duration_since(old_call).unwrap().as_secs_f64());
+                    old_call = SystemTime::now();
+
                     let mut vertices = vertex_receiver.recv().expect("Received Error while trying to read from vertex sender!");
 
                     if vertices.len() == 0{
@@ -336,6 +341,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
 
                 // Finish building the command buffer by calling `build`.
                 let command_buffer = builder.build().unwrap();
+                
+
 
                 let future = previous_frame_end
                     .take()
@@ -351,7 +358,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     // the GPU has finished executing the command buffer that draws the triangle.
                     .then_swapchain_present(queue.clone(), swapchain.clone(), image_num)
                     .then_signal_fence_and_flush();
-                
+                    
+
                 match future {
                     Ok(future) => {
                         previous_frame_end = Some(future.boxed());
@@ -365,7 +373,6 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                         previous_frame_end = Some(sync::now(device.clone()).boxed());
                     }
                 }
-
 
 
 
