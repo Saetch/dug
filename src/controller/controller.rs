@@ -218,7 +218,6 @@ fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
     lock.cursor_pos_relative = c_p_r;
     lock.cursor_pos_ingame = c_p_ig ;
     drop(lock);
-    println!("Cursor moved to {} / {} -> {} / {}" , c_p_r.0, c_p_r.1, c_p_ig.0, c_p_ig.1);
 }
 
 /**
