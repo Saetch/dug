@@ -6,7 +6,7 @@ use tokio::{runtime::{Runtime, Handle}, join, sync::{oneshot::Receiver as AsyncR
 
 use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime, cell::RefCell, rc::Rc};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
+    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess, CpuBufferPool},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
     },
@@ -91,15 +91,9 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
     
-    let _last_change = SystemTime::now();
-    let _vertices :Arc<RwLock<Vec<Vertex>>> = Arc::new(RwLock::new(Vec::new()));
     surface.window().set_visible(true);
-    
 
-    let mut loop_helper = LoopHelper::builder()
-    .report_interval_s(0.01) // report every half a second
-    .build_with_target_rate(60.0); // limit to 250 FPS if possible
-    let mut current_fps = None;
+
     //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -112,7 +106,6 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 //dropping the sender will result in an Err Result on the controller thread recv() method
                 ctr_sender = None;
                     (vertex_receiver).recv().unwrap();   //make the sender thread complete one more loop, in order to make it realize the running bool was set to false
-
                 
                 while let Some(cur_thread) = threads_vec.pop() {
                     cur_thread.join().unwrap();
@@ -142,13 +135,13 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 if let Some(controller_sender) = ctr_sender.clone(){
                     controller_sender.send(ControllerInput::KeyboardInput { key: input.virtual_keycode, state : input.state }).expect("Could not send keyboard input details to controller thread!");
                 }
+                
             }
             Event::WindowEvent {
                 event: WindowEvent::MouseInput { device_id: _, state , button: btn, .. },
                 ..
             } => {
                 if let Some(controller_sender) = ctr_sender.clone(){
-
                 controller_sender.send(ControllerInput::MouseInput { action: MouseInputType::Click { button: btn, state: state } }).expect("Could not send mouse click input details to controller thread!");
                 }
             }
@@ -175,8 +168,8 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 event: WindowEvent::CursorMoved { device_id: _, position, .. },
             ..
             } => {
-                if let Some(controller_sender) = ctr_sender.clone(){
 
+                if let Some(controller_sender) = ctr_sender.clone(){
                 controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Move(position.x as f32, position.y as f32) }).expect("Could not send mouse moved input details to controller thread");
                 }
             }
@@ -190,32 +183,24 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 }
             }
             Event::RedrawEventsCleared => {
-                let _delta = loop_helper.loop_start(); // or .loop_start_s() for f64 seconds
-                rt.block_on( async {
+                
+                
 
+                                
+                    let mut vertices = vertex_receiver.recv().expect("Received Error while trying to read from vertex sender!");
 
-                let (vertex_buffer, _) = join!(async{                
-                    let start = SystemTime::now();
-                    let mut vertices = vertex_receiver.recv_async().await.expect("Received Error while trying to read from vertex sender!");
-
-                    let end = SystemTime::now();
                     if vertices.len() == 0{
                         vertices = Vec::new();
-                        //vertices.push(Vertex{..Default::default()});
                         vertices.push(Vertex{
                             ..Default::default()
                         });
                     }
-    
-                    
-                    //let vertices = vertices_future.await.unwrap();
-                    
+                        
                     
                     //safe the current state in the vertex_buffer for drawing
                     let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
                     .unwrap();
-                vertex_buffer
-            }, async{
+           
                                 // Do not draw frame when screen dimensions are zero.
                 // On Windows, this can occur from minimizing the application.
                 let dimensions = surface.window().inner_size();
@@ -260,7 +245,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                     );
                     recreate_swapchain = false;
                 }
-            });
+            
 
 
 
@@ -304,7 +289,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 let mut builder = AutoCommandBufferBuilder::primary(
                     device.clone(),
                     queue.family(),
-                    CommandBufferUsage::MultipleSubmit,      //oneTimeSubmit is more optimized and applicable, since we create a new one every frame
+                    CommandBufferUsage::OneTimeSubmit,      //oneTimeSubmit is more optimized and applicable, since we create a new one every frame
                 )
                 .unwrap();
 
@@ -382,20 +367,14 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                 }
 
 
-                if let Some(fps) = loop_helper.report_rate() {
-                    current_fps = Some(fps.round());
-                    //println!("{} FPS", fps);
-                }
 
-                loop_helper.loop_sleep(); // sleeps to achieve a 250 FPS rate
 
-            });
+            
 
 
             }
-            //this Event gets submitted 60 times per second, due to vulkan restricting rendering to once per ~16.4-16.5 ms.
-            //this can be called way more if running on a different thread and thus (and because of hardware limitations aswell),
-            //it is needed, to update game-logic with delta-time
+            
+
             Event::MainEventsCleared => {
 
                 
