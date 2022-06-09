@@ -2,7 +2,7 @@
 use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}, time::SystemTime};
 
 use flume::{Receiver, Sender};
-use tokio::sync::{oneshot::Sender as AsyncSender, Mutex};
+use tokio::{sync::{oneshot::Sender as AsyncSender, Mutex}, join};
 use winit::event::{VirtualKeyCode, ElementState, MouseScrollDelta};
 
 use crate::{controller::{controller_input::MouseInputType, button_mapping::{load_default_keybinds, key_action_pressed, key_action_released}}, view::renderer::Vertex, model::{game_object::{debug_object::DebugObject}, model::Model}, drawable_object::{drawable_object::DrawableObject}};
@@ -57,6 +57,7 @@ pub(crate) fn up_action(_game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model
     todo!();
 }
 
+#[inline]
 pub(crate) fn camera_down_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_down_action");
     match lock.camera_movement.1 {
@@ -66,7 +67,7 @@ pub(crate) fn camera_down_action(game_state: &Arc<RwLock<GameState>>, _model: &A
         CamKeyPressed::Both => (),
     }
 }
-
+#[inline]
 pub(crate) fn camera_up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_up_action");
     match lock.camera_movement.1 {
@@ -76,7 +77,7 @@ pub(crate) fn camera_up_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc
         CamKeyPressed::Both => (),
     }
 }
-
+#[inline]
 pub(crate) fn camera_right_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_right_action");
     match lock.camera_movement.0 {
@@ -86,7 +87,7 @@ pub(crate) fn camera_right_action(game_state: &Arc<RwLock<GameState>>, _model: &
         CamKeyPressed::Both => (),
     }
 }
-
+#[inline]
 pub(crate) fn camera_left_action(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_left_action");
     match lock.camera_movement.0 {
@@ -96,7 +97,7 @@ pub(crate) fn camera_left_action(game_state: &Arc<RwLock<GameState>>, _model: &A
         CamKeyPressed::Both => (),
     }
 }
-
+#[inline]
 pub(crate) fn camera_down_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_down_action_released");
     match lock.camera_movement.1 {
@@ -106,7 +107,7 @@ pub(crate) fn camera_down_action_released(game_state: &Arc<RwLock<GameState>>, _
         CamKeyPressed::Both => lock.camera_movement.1 = CamKeyPressed::Negative,
     }
 }
-
+#[inline]
 pub(crate) fn camera_up_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_up_action_released");
     match lock.camera_movement.1 {
@@ -116,7 +117,7 @@ pub(crate) fn camera_up_action_released(game_state: &Arc<RwLock<GameState>>, _mo
         CamKeyPressed::Both => lock.camera_movement.1 = CamKeyPressed::Positive,
     }
 }
-
+#[inline]
 pub(crate) fn camera_right_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_right_action_released");
     match lock.camera_movement.0 {
@@ -127,6 +128,7 @@ pub(crate) fn camera_right_action_released(game_state: &Arc<RwLock<GameState>>, 
     }
 }
 
+#[inline]
 pub(crate) fn camera_left_action_released(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut lock = game_state.write().expect("Could not write to gameState in camera_left_action_released");
     match lock.camera_movement.0 {
@@ -137,23 +139,23 @@ pub(crate) fn camera_left_action_released(game_state: &Arc<RwLock<GameState>>, _
     }
 }
 
-
+#[inline]
 pub(crate) fn half_screen_width_ingame_regular(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut game_state_lock = game_state.write().unwrap();
     game_state_lock.window_dimensions_ingame = (1.0, 1.0);
 }
-
+#[inline]
 pub(crate) fn half_screen_width_ingame_2times(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut game_state_lock = game_state.write().unwrap();
     game_state_lock.window_dimensions_ingame = (2.0, 2.0);
 }
-
+#[inline]
 pub(crate) fn half_screen_width_ingame_point5times(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     let mut game_state_lock = game_state.write().unwrap();
     game_state_lock.window_dimensions_ingame = (0.5, 0.5);
 }
 
-
+#[inline]
 fn process_mouse_input(action: MouseInputType, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<(Option<KeyboundFunction>, Option<KeyboundFunction>)>, model_pointer:  &Arc<Model>){
     match action{
         MouseInputType::Move(x, y) => mouse_moved_action(x,y, game_state),
@@ -175,21 +177,21 @@ pub(crate) fn place_debug_object_action(game_state: &Arc<RwLock<GameState>>, mod
 
     let lock = game_state.read().unwrap();
     let mouse_coords = lock.cursor_pos_ingame;
-    let mut lock = model.game_objects.write().unwrap();
+    let mut lock = model.game_objects.blocking_write();
     let new_object = DebugObject::new(mouse_coords);
     lock.push(Box::new(new_object));
 
 
 }
-
+#[inline]
 pub(crate) fn simulate_mouse_wheel_up(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     process_mouse_scroll(MouseScrollDelta::LineDelta(0.0, 1.0), game_state);
 }
-
+#[inline]
 pub(crate) fn simulate_mouse_wheel_down(game_state: &Arc<RwLock<GameState>>, _model: &Arc<Model>){
     process_mouse_scroll(MouseScrollDelta::LineDelta(0.0, -1.0), game_state);
 }
-
+#[inline]
 fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState, game_state: &Arc<RwLock<GameState>>, keybinds: &Vec<(Option<KeyboundFunction>, Option<KeyboundFunction>)>, model:  &Arc<Model>){
     if  let Some(key) = key_input {
         match state {
@@ -199,7 +201,7 @@ fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState
 
     }
 }
-
+#[inline]
 fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
     let lock = game_state.read().expect("Could not read current gameState in mouse_moved_action!");
     let screen_center_pos = lock.camera_pos;
@@ -223,6 +225,7 @@ fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
 /**
  * similiar to mouse_moved_action, except the mouse didn't move and the recalculating is needed because the zoom level changed
  */
+#[inline]
 fn recalculate_mouse_pos(game_state: &Arc<RwLock<GameState>>){
     let lock = game_state.read().expect("Could not read current gameState in recalculate_mouse_pos!");
     let screen_center_pos = lock.camera_pos;
@@ -235,6 +238,7 @@ fn recalculate_mouse_pos(game_state: &Arc<RwLock<GameState>>){
 }
 
 //process mouse_wheel
+#[inline]
 pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<GameState>>){
 
     match delta {
@@ -252,8 +256,8 @@ pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<Gam
 
 }
 
-
-pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender<Vec<Vertex>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
+#[inline]
+pub async fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender<Vec<Vertex>>, game_state: Arc<RwLock<GameState>>, model_pointer:  Arc<Model>){
 
    
     let mut loop_helper = LoopHelper::builder()
@@ -280,13 +284,12 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let new_cam_pos = (cam_mov.0 * speed *win_dimensions.0 * delta + camera_pos.0, cam_mov.1 * speed* win_dimensions.1 *  delta + camera_pos.1);
-        let lock = model_pointer.game_objects.read().unwrap();
-        let mut ret_vector:Vec<Vertex> = lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten().collect();
+        let vec2fut = iterate_through_game_objects(&model_pointer, new_cam_pos, win_dimensions);
+        let vec1fut = iterate_through_static_objects(&model_pointer, new_cam_pos, win_dimensions);
+        
+        let (mut ret_vector, additional_vector) = join!(vec1fut, vec2fut);
+        ret_vector.extend(additional_vector);
 
-        drop(lock);
-        let lock = model_pointer.static_objects.read().unwrap();
-        ret_vector.extend(&mut (lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten())); 
-        drop(lock);    
         
         match vertex_sender.send(ret_vector){
             Ok(_) => (),
@@ -311,4 +314,17 @@ pub fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: Sender
     }
 
     println!("Gracefully stopping the communications thread");
+}
+
+#[inline]
+async fn iterate_through_static_objects(model: &Arc<Model>, new_cam_pos:(f64, f64), win_dimensions: (f64,f64)) -> Vec<Vertex>{
+    let lock = model.static_objects.read().await;
+    lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten().collect()
+}
+
+
+#[inline]
+async fn iterate_through_game_objects(model: &Arc<Model>, new_cam_pos:(f64, f64), win_dimensions: (f64,f64)) -> Vec<Vertex>{
+    let lock = model.game_objects.read().await;
+    lock.iter().map(|o| o.construct_vertices(new_cam_pos, win_dimensions)).into_iter().flatten().collect()
 }

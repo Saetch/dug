@@ -48,7 +48,7 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
 
 
     
-
+#[inline]
 pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: Handle) {
     let mut ctr_sender = Some(controller_s);
     let (device, queue, pipeline, images, render_pass, event_loop
