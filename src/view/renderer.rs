@@ -309,7 +309,7 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
                             //
                             // Only attachments that have `LoadOp::Clear` are provided with clear
                             // values, any others should use `ClearValue::None` as the clear value.
-                            clear_values: vec![Some([0.4, 0.4, 0.4, 1.0].into())],
+                            clear_values: vec![Some([0.4, 0.4, 0.4, 0.0].into())],
                             ..RenderPassBeginInfo::framebuffer(framebuffers[image_num].clone())
                         },
                         // The contents of the first (and only) subpass. This can be either

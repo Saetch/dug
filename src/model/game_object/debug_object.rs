@@ -11,8 +11,13 @@ pub struct DebugObject{
 }
 
 impl DebugObject{
-    pub fn new(position: (f64, f64)) -> Self{
+    #[allow(dead_code)]
+    pub fn new(position: (f64, f64), tex_i : u32) -> Self{
         DebugObject { position, tex_i: 0, size: 0.4 }
+    }    
+    #[allow(dead_code)]
+    pub fn new_with_size(position: (f64, f64), tex_i : u32, size: f32) -> Self{
+        DebugObject { position, tex_i, size }
     }
     #[allow(dead_code)]
     fn copy(&self)-> Box<dyn DrawableObject> {

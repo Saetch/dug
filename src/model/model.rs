@@ -1,4 +1,4 @@
-use std::{sync::{atomic::{AtomicBool, self}, Arc}, time::Duration, thread::sleep};
+use std::{sync::{atomic::{AtomicBool, self, AtomicU8}, Arc}, time::Duration, thread::sleep, cell::RefCell, rc::Rc};
 
 use futures::executor;
 use rand::{thread_rng};
@@ -18,8 +18,11 @@ pub struct Model{
     //like arc. data that is accessed by the model in the loop and only be the model itself should probably be moved into the loop itself
     pub game_objects: Arc<AsyncRwLock<Vec<Box<dyn GameObject + Send + Sync>>>>,
     pub static_objects: Arc<AsyncRwLock<Vec<StaticObject>>>,
+    static_elements_per_row: AtomicU8,
    
+    
 }
+
 
 
 
@@ -29,7 +32,7 @@ impl Model {
         Model{
             game_objects: Arc::new(AsyncRwLock::new(Vec::new())),
             static_objects: Arc::new(AsyncRwLock::new(Vec::new())),
-           
+            static_elements_per_row: AtomicU8::new(0),
         }
     }
 
@@ -77,10 +80,16 @@ impl Model {
     
         let mut lock = self.game_objects.write().await;
         for i in 0..550{
-            let new_debug_object = DebugObject::new((i as f64 *0.4, 0.0));
+            let new_debug_object = DebugObject::new_with_size((i as f64 *0.4, 0.0), 2, 0.2);
     
             lock.push(Box::new(new_debug_object));
         }
+
+
+        self.static_elements_per_row.store(5, atomic::Ordering::Relaxed);
+
+
+
     }
 }
 

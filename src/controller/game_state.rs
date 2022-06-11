@@ -27,7 +27,7 @@ impl GameState {
             game_state_id: AtomicU8::new(1),
             camera_pos: (0.0,0.0), cursor_pos_relative: (0.0, 0.0), cursor_pos_ingame: (0.0, 0.0),
             window_dimensions: window_dimensions,
-            window_dimensions_ingame: (1.0, 1.0),
+            window_dimensions_ingame: (1.6, 0.9),   //display format 16:9 or similiar
             camera_movement: (CamKeyPressed::None, CamKeyPressed::None),
             cam_speed: 1.0f32,
          }

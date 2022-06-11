@@ -2,6 +2,7 @@ use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, R
 use constants::{WINDOW_INIT_X, WINDOW_INIT_Y};
 use controller::{controller_input::ControllerInput, controller::handle_communication_loop, game_state::GameState};
 use flume::Receiver;
+extern crate jpeg_decoder as jpeg;
 use lazy_static::lazy_static;
 use model::{model::{ Model}};
 use tokio::{runtime::{Runtime, Handle}, sync::{oneshot::{ self}, Mutex}};

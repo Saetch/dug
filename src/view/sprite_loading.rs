@@ -8,7 +8,7 @@ use super::renderer::Vertex;
 
 pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, vs: Arc<ShaderModule>, fs: Arc<ShaderModule>)-> (Arc<GraphicsPipeline>, Arc<PersistentDescriptorSet>){
     let dwarf_base_house_texture = {
-        let png_bytes = include_bytes!("../../Dwarf_BaseHouse_px9.png").to_vec();
+        let png_bytes = include_bytes!("../../textures/Dwarf_BaseHouse_px9.png").to_vec();
         let cursor = Cursor::new(png_bytes);
         let decoder = png::Decoder::new(cursor);
         let mut reader = decoder.read_info().unwrap();
@@ -36,7 +36,35 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
     };
     
     let rust_logo_texture = {
-        let png_bytes = include_bytes!("../../image_img.png").to_vec();
+        let png_bytes = include_bytes!("../../textures/image_img.png").to_vec();
+        let cursor = Cursor::new(png_bytes);
+        let decoder = png::Decoder::new(cursor);
+        let mut reader = decoder.read_info().unwrap();
+        let info = reader.info();
+        let dimensions = ImageDimensions::Dim2d {
+            width: info.width,
+            height: info.height,
+            array_layers: 1,
+        };
+        let mut image_data = Vec::new();
+        image_data.resize((info.width * info.height * 4) as usize, 0);
+        reader.next_frame(&mut image_data).unwrap();
+    
+        let image = ImmutableImage::from_iter(
+            image_data,
+            dimensions,
+            MipmapsCount::One,
+            Format::R8G8B8A8_SRGB,
+            queue.clone(),
+        )
+        .unwrap()
+        .0;
+    
+        ImageView::new_default(image).unwrap()
+    };
+
+    let background1_cracked = {
+        let png_bytes = include_bytes!("../../textures/background1_cracked.png").to_vec();
         let cursor = Cursor::new(png_bytes);
         let decoder = png::Decoder::new(cursor);
         let mut reader = decoder.read_info().unwrap();
@@ -75,7 +103,13 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
     )
     .unwrap();
     
+    let descriptor_array = [
+        (dwarf_base_house_texture.clone() as _, sampler.clone()),
+        (rust_logo_texture.clone() as _, sampler.clone()),
+        (background1_cracked.clone() as _, sampler.clone()),
+    ];
     
+
     //create a pipeline layout that can take the bindings for the texture samplers
     let pipeline_layout = {
         let mut layout_create_infos: Vec<_> = DescriptorSetLayoutCreateInfo::from_requirements(
@@ -85,7 +119,7 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
         // Set 0, Binding 0
         let binding = layout_create_infos[0].bindings.get_mut(&0).unwrap();
         binding.variable_descriptor_count = true;
-        binding.descriptor_count = 2;
+        binding.descriptor_count = descriptor_array.len() as u32;
     
         let set_layouts = layout_create_infos
             .into_iter()
@@ -134,14 +168,10 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
     let layout = pipeline.layout().set_layouts().get(0).unwrap();
     
     
-    let descriptor_array = [
-        (dwarf_base_house_texture.clone() as _, sampler.clone()),
-        (rust_logo_texture.clone() as _, sampler.clone()),
-    ];
-    
+
     let descriptor_set = PersistentDescriptorSet::new_variable(
         layout.clone(),
-        2,
+        descriptor_array.len() as u32,
         [WriteDescriptorSet::image_view_sampler_array(
             0,
             0,

@@ -178,7 +178,7 @@ pub(crate) fn place_debug_object_action(game_state: &Arc<RwLock<GameState>>, mod
     let lock = game_state.read().unwrap();
     let mouse_coords = lock.cursor_pos_ingame;
     let mut lock = model.game_objects.blocking_write();
-    let new_object = DebugObject::new(mouse_coords);
+    let new_object = DebugObject::new(mouse_coords, 0);
     lock.push(Box::new(new_object));
 
 
