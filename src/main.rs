@@ -3,7 +3,6 @@ use constants::{WINDOW_INIT_X, WINDOW_INIT_Y};
 use controller::{controller_input::ControllerInput, controller::handle_communication_loop, game_state::GameState};
 use flume::Receiver;
 extern crate jpeg_decoder as jpeg;
-use lazy_static::lazy_static;
 use model::{model::{ Model}};
 use tokio::{runtime::{Runtime, Handle}, sync::{oneshot::{ self}, Mutex}};
 use view::renderer::Vertex;
@@ -17,7 +16,6 @@ mod model;
 fn main(){
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rt = rt.handle();                               //Cloning a reference to a Handle returns a Copy of an actual Handle
-
     let (threads_vec,
         controller_sender,
         vertex_receiver,
