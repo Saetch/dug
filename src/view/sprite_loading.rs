@@ -26,7 +26,7 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
             image_data,
             dimensions,
             MipmapsCount::One,
-            Format::R8G8B8A8_SRGB,
+            Format::R8G8B8A8_UNORM,
             queue.clone(),
         )
         .unwrap()
@@ -54,7 +54,7 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
             image_data,
             dimensions,
             MipmapsCount::One,
-            Format::R8G8B8A8_SRGB,
+            Format::R8G8B8A8_UNORM,
             queue.clone(),
         )
         .unwrap()
@@ -64,7 +64,7 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
     };
 
     let background1_cracked = {
-        let png_bytes = include_bytes!("../../textures/background1_cracked.png").to_vec();
+        let png_bytes = include_bytes!("../../textures/background1_cracked_floor.png").to_vec();
         let cursor = Cursor::new(png_bytes);
         let decoder = png::Decoder::new(cursor);
         let mut reader = decoder.read_info().unwrap();
@@ -82,7 +82,38 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
             image_data,
             dimensions,
             MipmapsCount::One,
-            Format::R8G8B8A8_SRGB,
+            Format::R8G8B8A8_UNORM,
+            queue.clone(),
+        )
+        .unwrap()
+        .0;
+    
+        ImageView::new_default(image).unwrap()
+    };
+    
+
+
+
+    let background1_cracked_no_floor = {
+        let png_bytes = include_bytes!("../../textures/background1_cracked_no_floor.png").to_vec();
+        let cursor = Cursor::new(png_bytes);
+        let decoder = png::Decoder::new(cursor);
+        let mut reader = decoder.read_info().unwrap();
+        let info = reader.info();
+        let dimensions = ImageDimensions::Dim2d {
+            width: info.width,
+            height: info.height,
+            array_layers: 1,
+        };
+        let mut image_data = Vec::new();
+        image_data.resize((info.width * info.height * 4) as usize, 0);
+        reader.next_frame(&mut image_data).unwrap();
+    
+        let image = ImmutableImage::from_iter(
+            image_data,
+            dimensions,
+            MipmapsCount::One,
+            Format::R8G8B8A8_UNORM,
             queue.clone(),
         )
         .unwrap()
@@ -97,7 +128,8 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
         SamplerCreateInfo {
             mag_filter: Filter::Linear,
             min_filter: Filter::Linear,
-            address_mode: [SamplerAddressMode::Repeat; 3],  //this will determine what happens when the sampler is supposed to get the color of a pixel outside the image. Repeat: act as if the image repeats endlessly, thus get the color of the next hypothetical image. 
+
+            address_mode: [SamplerAddressMode::ClampToEdge; 3],  //this will determine what happens when the sampler is supposed to get the color of a pixel outside the image. Repeat: act as if the image repeats endlessly, thus get the color of the next hypothetical image. 
             ..Default::default()
         },
     )
@@ -107,6 +139,7 @@ pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: 
         (dwarf_base_house_texture.clone() as _, sampler.clone()),
         (rust_logo_texture.clone() as _, sampler.clone()),
         (background1_cracked.clone() as _, sampler.clone()),
+        (background1_cracked_no_floor.clone() as _, sampler.clone()),
     ];
     
 

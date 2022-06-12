@@ -79,8 +79,18 @@ impl Model {
 
     
         let mut lock = self.game_objects.write().await;
-        for i in 0..550{
+        for i in 0..5500{
             let new_debug_object = DebugObject::new_with_size((i as f64 *0.4, 0.0), 2, 0.2);
+    
+            lock.push(Box::new(new_debug_object));
+        }
+        for i in 0..5500{
+            let new_debug_object = DebugObject::new_with_size((i as f64 *0.4, -0.4), 3, 0.2);
+    
+            lock.push(Box::new(new_debug_object));
+        }
+        for i in 0..5500{
+            let new_debug_object = DebugObject::new_with_size((i as f64 *0.4, -0.8), 3, 0.2);
     
             lock.push(Box::new(new_debug_object));
         }

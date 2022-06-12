@@ -437,6 +437,7 @@ dependencies = [
  "serde",
  "spin_sleep",
  "tokio",
+ "vk-sys",
  "vulkano",
  "vulkano-shaders",
  "vulkano-win",
@@ -1452,6 +1453,12 @@ checksum = "29f3bfdc05ca5a9f385f50daa1d714b60324b68814b3bae99d797f0952e13e84"
 dependencies = [
  "xml-rs",
 ]
+
+[[package]]
+name = "vk-sys"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "584003afc735800b0619a724332f37a28788f56fa9349874ee2f50874be0d239"
 
 [[package]]
 name = "vulkano"

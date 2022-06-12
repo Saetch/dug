@@ -9,7 +9,7 @@ use vulkano::{
         Device, DeviceCreateInfo, DeviceExtensions, Features, QueueCreateInfo, Queue,
     },
     image::{
-        SwapchainImage, ImageUsage,
+        SwapchainImage, ImageUsage, AttachmentImage, SampleCount,
     },
     impl_vertex,
     instance::{Instance, InstanceCreateInfo},
@@ -27,7 +27,7 @@ use winit::{
     window::{Window, WindowBuilder}, event_loop::EventLoop, dpi::PhysicalSize,
 };
 use crate::{view::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites}, constants::{WINDOW_INIT_X, WINDOW_INIT_Y}};
-pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>){
+pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>, Arc<AttachmentImage>){
     // instance
 
 // surface
@@ -97,14 +97,20 @@ let device_extensions = DeviceExtensions {
     ..DeviceExtensions::none()
 };
 
+let optimal_features = vulkano::device::Features{
+    sampler_anisotropy: true,
+    ..Features::none()
+};
+
 // We then choose which physical device to use. First, we enumerate all the available physical
 // devices, then apply filters to narrow them down to those that can support our needs.
 let (physical_device, queue_family) = PhysicalDevice::enumerate(&instance)
     .filter(|&p| {
+
         // Some devices may not support the extensions or features that your application, or
         // report properties and limits that are not sufficient for your application. These
         // should be filtered out here.
-        p.supported_extensions().is_superset_of(&device_extensions)
+        p.supported_extensions().is_superset_of(&device_extensions) 
     })
     .filter_map(|p| {
         // For each physical device, we try to find a suitable queue family that will execute
@@ -142,11 +148,11 @@ let (physical_device, queue_family) = PhysicalDevice::enumerate(&instance)
     .min_by_key(|(p, _)| {
         // We assign a better score to device types that are likely to be faster/better.
         match p.properties().device_type {
-            PhysicalDeviceType::DiscreteGpu => 0,
-            PhysicalDeviceType::IntegratedGpu => 1,
-            PhysicalDeviceType::VirtualGpu => 2,
-            PhysicalDeviceType::Cpu => 3,
-            PhysicalDeviceType::Other => 4,
+            PhysicalDeviceType::DiscreteGpu => 0 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
+            PhysicalDeviceType::IntegratedGpu => 1 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
+            PhysicalDeviceType::VirtualGpu => 2 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
+            PhysicalDeviceType::Cpu => 3 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
+            PhysicalDeviceType::Other => 4 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
         }
     })
     .unwrap();
@@ -257,6 +263,17 @@ let (swapchain, images) = {
     .unwrap()
 };
 
+    // Creating our intermediate multisampled image.
+    //
+    // As explained in the introduction, we pass the same dimensions and format as for the final
+    // image. But we also pass the number of samples-per-pixel, which is 4 here.
+    let intermediary = AttachmentImage::transient_multisampled(
+        device.clone(),
+        [1920, 1080],
+        SampleCount::Sample4,
+        vulkano::format::Format::R8G8B8A8_UNORM,
+    )
+    .unwrap();
 
 impl_vertex!(Vertex, position, tex_i, coords);
 
@@ -312,5 +329,5 @@ let render_pass = vulkano::single_pass_renderpass!(
 let (pipeline, descriptor_set) = load_sprites(device.clone(), queue.clone(), render_pass.clone(), vs.clone(), fs.clone());
 
 
-return (device, queue, pipeline, images, render_pass, event_loopi, surface,  swapchain, descriptor_set)
+return (device, queue, pipeline, images, render_pass, event_loopi, surface,  swapchain, descriptor_set, intermediary)
 }

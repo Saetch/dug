@@ -52,7 +52,7 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
 pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: Handle) {
     let mut ctr_sender = Some(controller_s);
     let (device, queue, pipeline, images, render_pass, event_loop
-    , surface,mut swapchain, descriptor_set)
+    , surface,mut swapchain, descriptor_set, immediary)
      = init();
     // Dynamic viewports allow us to recreate just the viewport when the window is resized
     // Otherwise we would have to recreate the whole pipeline.
@@ -186,11 +186,6 @@ pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Ar
             }
             Event::RedrawEventsCleared => {
                 
-
-                    let now_call= SystemTime::now();
-
-                    //println!("Time dif: {}", now_call.duration_since(old_call).unwrap().as_secs_f64());
-                    old_call = SystemTime::now();
 
                     let mut vertices = vertex_receiver.recv().expect("Received Error while trying to read from vertex sender!");
 
