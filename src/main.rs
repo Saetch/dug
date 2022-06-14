@@ -1,4 +1,4 @@
-use std::{thread::{ spawn, sleep}, sync::{Arc, RwLock}, time::Duration};
+use std::{thread::{ spawn, sleep}, sync::{Arc, RwLock}, time::Duration, net::{TcpStream, TcpListener}};
 
 use rendering::rendering_run;
 
@@ -25,4 +25,34 @@ fn main(){
     //otherwise it will lead to cross-platform compatibility problems
 
     pollster::block_on(rendering_run(running, threads_vec));
+}
+
+
+pub fn primes_below(n: u64) -> Vec<u64> {
+    let mut primes = vec![2];
+    let mut i = 3;
+    while i < n {
+        if is_prime(i) {
+            primes.push(i);
+        }
+        i += 2;
+    }
+    primes
+}
+
+pub fn is_prime(n: u64) -> bool {
+    if n == 2 {
+        return true;
+    }
+    if n % 2 == 0 {
+        return false;
+    }
+    let mut i = 3;
+    while i * i <= n {
+        if n % i == 0 {
+            return false;
+        }
+        i += 2;
+    }
+    true
 }

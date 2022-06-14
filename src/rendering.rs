@@ -1,27 +1,31 @@
 use std::{sync::{RwLock, Arc}, thread::JoinHandle, time::SystemTime};
-use bytemuck::{Pod, Zeroable, bytes_of};
+use bytemuck::{Pod, Zeroable};
 use rand::{thread_rng, Rng};
-use wgpu::{Features, include_wgsl, util::DeviceExt, Operations};
+use wgpu::{ include_wgsl, util::DeviceExt};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{WindowBuilder, Window},
 };
-use std::time::Duration;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    tex_coords: [f32; 2],
-}
+
+    // To create a buffer that will store the shape of our triangle.
+    // We use #[repr(C)] here to force rustc to not do anything funky with our data, although for this
+    // particular example, it doesn't actually change the in-memory representation. This can be understood as represent this data as it would be in C Code
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
+    pub struct Vertex {
+        pub(crate) position: [f32; 2],
+        pub(crate) tex_i: u32,
+        pub(crate) tex_coords: [f32; 2],
+    }
     //create the actual vertices that should be drawn. This could be updated at compile time
     const VERTICES: &[Vertex] = &[
-        Vertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.00759614], }, // A
-        Vertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], }, // B
-        Vertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453, 0.949397], }, // C
-        Vertex { position: [0.35966998, -0.3473291, 0.0], tex_coords: [0.85967, 0.84732914], }, // D
-        Vertex { position: [0.44147372, 0.2347359, 0.0], tex_coords: [0.9414737, 0.2652641], }, // E
+        Vertex { position: [-0.0868241, 0.49240386], tex_i: 0, tex_coords: [0.4131759, 0.00759614], }, // A
+        Vertex { position: [-0.49513406, 0.06958647],  tex_i: 0, tex_coords: [0.0048659444, 0.43041354], }, // B
+        Vertex { position: [-0.21918549, -0.44939706],  tex_i: 0, tex_coords: [0.28081453, 0.949397], }, // C
+        Vertex { position: [0.35966998, -0.3473291],  tex_i: 0, tex_coords: [0.85967, 0.84732914], }, // D
+        Vertex { position: [0.44147372, 0.2347359],  tex_i: 0, tex_coords: [0.9414737, 0.2652641], }, // E
     ];
     
     const INDICES: &[u16] = &[
@@ -43,11 +47,16 @@ impl Vertex {
                 wgpu::VertexAttribute {                                                 //define general attributes of the vertices, here it is just a plain 1 to 1 attribution
                     offset: 0,
                     shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     shader_location: 1,
+                    format: wgpu::VertexFormat::Uint32,
+                },
+                wgpu::VertexAttribute{
+                    offset: (std::mem::size_of::<[f32;2]>() + std::mem::size_of::<u32>()) as wgpu::BufferAddress,
+                    shader_location: 2,
                     format: wgpu::VertexFormat::Float32x2,
                 }
             ]
@@ -94,14 +103,8 @@ impl State {
             &wgpu::DeviceDescriptor {
                 features: wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,            //you can get a list of supported features by calling adapter.features() or device.features()
 
-                limits: if cfg!(target_arch = "wasm32") {
-                    println!("loading web configuration");
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                    
-                } else {
-                    println!("loading default configuration");
-                    wgpu::Limits::default()
-                },
+                limits: wgpu::Limits::default(),
+                
                 label: None,
             },
             None, // Trace path
@@ -133,22 +136,40 @@ impl State {
         };
 
 
-        let diffuse_texture = device.create_texture(
-            &wgpu::TextureDescriptor {
-                // All textures are stored as 3D, we represent our 2D texture
-                // by setting depth to 1.
-                size: texture_size,
-                mip_level_count: 1, 
+        let diffuse_texture = {
+            let img_data = include_bytes!("../image_img.png");
+            let decoder = png::Decoder::new(std::io::Cursor::new(img_data));
+            let mut reader = decoder.read_info().unwrap();
+            let mut buf = vec![0; reader.output_buffer_size()];
+            let info = reader.next_frame(&mut buf).unwrap();
+
+            let size = wgpu::Extent3d {
+                width: info.width,
+                height: info.height,
+                depth_or_array_layers: 1,
+            };
+            let texture_format = wgpu::TextureFormat::Rgba8UnormSrgb;
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: None,
+                size,
+                mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                // Most images are stored using sRGB so we need to reflect that here.
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
-                // COPY_DST means that we want to copy data to this texture
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                label: Some("diffuse_texture"),
-            }
-        );
+                format: texture_format,
+                usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+            });
+            queue.write_texture(
+                texture.as_image_copy(),
+                &buf,
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: std::num::NonZeroU32::new(info.width * 4),
+                    rows_per_image: None,
+                },
+                size,
+            );
+            texture
+        };
 
 
 
@@ -258,7 +279,7 @@ impl State {
                 entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState { // 4.
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),         //replace pixels instead of blending
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),         //replace pixels instead of blending
                     write_mask: wgpu::ColorWrites::ALL,             //specify color channels (R, G, B or similiar) that can be written to. Others will be ignored 
                 }],
             }),    
@@ -301,6 +322,7 @@ impl State {
                 }
             );
             let num_indices = INDICES.len() as u32;
+
             
         Self {
             surface,
@@ -319,7 +341,7 @@ impl State {
             last_render: moment,
             index_buffer: index_buffer,
             num_indices: num_indices,
-            diffuse_bind_group: diffuse_bind_group
+            diffuse_bind_group: diffuse_bind_group,
         }
     }
      
@@ -348,7 +370,21 @@ impl State {
                     _ => ()
                     
                 }
-            } 
+            }
+            WindowEvent::KeyboardInput { input: keyboard_input, .. } => {
+                if let winit::event::KeyboardInput {
+                    virtual_keycode: Some(keycode),
+                    state: winit::event::ElementState::Pressed,
+                    ..
+                } = keyboard_input
+                {
+                    match keycode {
+                        winit::event::VirtualKeyCode::Escape => panic!("Exiting"),
+                        _ => (),
+                    }
+                }
+            }
+            
             _ => ()
         }
         false
@@ -359,6 +395,7 @@ impl State {
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
 
+        
         //check for performance, this is only loosely true, since these actions are not 0 cost, but might be enough for now.
         //16.6ms are needed for 60fps (that is 16666 qs)
         let now = SystemTime::now();
@@ -396,7 +433,7 @@ impl State {
             depth_stencil_attachment: None,
         });
             // NEW!
-         render_pass.set_pipeline(&self.render_pipeline); // 2.
+        render_pass.set_pipeline(&self.render_pipeline); // 2.
         render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);   
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16); // 1.
@@ -422,7 +459,7 @@ pub(crate) async fn rendering_run(running: Arc<RwLock<bool>>, mut threads_vec: V
     let state_future = State::new(&window);
     let mut state = state_future.await;
 
-        
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::RedrawRequested(window_id) if window_id == window.id() => {
             //we could trigger this Event by calling window.request_redraw(), for example in MainEventsCleared, but rendering right there is faster due to reduced function overhead
