@@ -19,20 +19,6 @@ use winit::{
         pub(crate) tex_i: u32,
         pub(crate) tex_coords: [f32; 2],
     }
-    //create the actual vertices that should be drawn. This could be updated at compile time
-    const VERTICES: &[Vertex] = &[
-        Vertex { position: [-0.0868241, 0.49240386], tex_i: 0, tex_coords: [0.4131759, 0.00759614], }, // A
-        Vertex { position: [-0.49513406, 0.06958647],  tex_i: 0, tex_coords: [0.0048659444, 0.43041354], }, // B
-        Vertex { position: [-0.21918549, -0.44939706],  tex_i: 0, tex_coords: [0.28081453, 0.949397], }, // C
-        Vertex { position: [0.35966998, -0.3473291],  tex_i: 0, tex_coords: [0.85967, 0.84732914], }, // D
-        Vertex { position: [0.44147372, 0.2347359],  tex_i: 0, tex_coords: [0.9414737, 0.2652641], }, // E
-    ];
-    
-    const INDICES: &[u16] = &[
-        0, 1, 4,
-        1, 2, 4,
-        2, 3, 4,
-    ];
 
 //unsafe impl bytemuck::Pod for Vertex {}   use these for implementing Pod and Zeroable for structs, that cant derive these traits
 //unsafe impl bytemuck::Zeroable for Vertex {}
@@ -72,12 +58,11 @@ struct State {
 
     render_pipeline: wgpu::RenderPipeline,  //The render pipeline is needed for drawing onto a surface, using shaders
     vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer, 
-    num_indices: u32,
     diffuse_bind_group: wgpu::BindGroup, 
 
     bkcolor: wgpu::Color,
     last_render: SystemTime,
+    vertices: Vec<Vertex>,
 }
 
 impl State {
@@ -303,25 +288,27 @@ impl State {
             multiview: None, // 5.
         });
 
+            //create the actual vertices that should be drawn. This could be updated at compile time
+    let vertices: Vec<Vertex> = vec!(
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 1.0], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [1.0, 0.0], }, 
+        Vertex { position: [-0.0, 1.0],  tex_i: 0, tex_coords: [0.0, 0.0], }, 
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 1.0], }, 
+        Vertex { position: [1.0, 0.0],  tex_i: 0, tex_coords: [1.0, 1.0], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [1.0, 0.0], }, 
+
+
+    );
 
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(VERTICES),
+                contents: bytemuck::cast_slice(&vertices),
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
             let moment = SystemTime::now();
 
-
-            let index_buffer = device.create_buffer_init(
-                &wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(INDICES),
-                    usage: wgpu::BufferUsages::INDEX,
-                }
-            );
-            let num_indices = INDICES.len() as u32;
 
             
         Self {
@@ -339,9 +326,8 @@ impl State {
             render_pipeline: render_pipeline,
             vertex_buffer: vertex_buffer,
             last_render: moment,
-            index_buffer: index_buffer,
-            num_indices: num_indices,
             diffuse_bind_group: diffuse_bind_group,
+            vertices
         }
     }
      
@@ -436,8 +422,8 @@ impl State {
         render_pass.set_pipeline(&self.render_pipeline); // 2.
         render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);   
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16); // 1.
-        render_pass.draw_indexed(0..self.num_indices, 0, 0..1); // 3. 
+        render_pass.draw(0..(self.vertices.len() as u32), 0..1);
+
         drop(render_pass);                     //this is needed, because in the previous step, the _render_pass object borrowed encoder mutably,
                                                 //  and thus we need to drop that borrow in order to use the encoder in the next step
 
