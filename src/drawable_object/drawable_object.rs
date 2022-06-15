@@ -15,32 +15,32 @@ pub trait DrawableObject:{
             Vertex{
                 position: [x+size_x, y-size_y],
                 tex_i,
-                coords: self.top_right_coords(),
+                tex_coords: self.top_right_coords(),
             },
             Vertex{
                 position: [x-size_x, y-size_y],
                 tex_i,
-                coords: self.top_left_coords(),
+                tex_coords: self.top_left_coords(),
             },
             Vertex{
                 position: [x-size_x, y+size_y],
                 tex_i,
-                coords: self.bottom_left_coords(),
+                tex_coords: self.bottom_left_coords(),
             },
             Vertex{
                 position: [x+size_x, y-size_y],
                 tex_i,
-                coords: self.top_right_coords(),
+                tex_coords: self.top_right_coords(),
             },
             Vertex{
                 position: [x-size_x, y+size_y],
                 tex_i,
-                coords: self.bottom_left_coords(),
+                tex_coords: self.bottom_left_coords(),
             },
             Vertex{
                 position: [x+size_x, y+size_y],
                 tex_i,
-                coords: self.bottom_right_coords(),
+                tex_coords: self.bottom_right_coords(),
             }
             
         ]

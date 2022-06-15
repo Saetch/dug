@@ -1,37 +1,12 @@
-
+use std::{sync::{RwLock, Arc}, thread::JoinHandle, time::SystemTime, num::NonZeroU32, default};
 use bytemuck::{Pod, Zeroable};
-use flume::{Sender, Receiver, r#async};
-use spin_sleep::LoopHelper;
-use tokio::{runtime::{Runtime, Handle}, join, sync::{oneshot::Receiver as AsyncReceiver, Mutex}};
-
-use std::{sync::{Arc, atomic::AtomicBool, RwLock}, thread::JoinHandle, time::SystemTime, cell::RefCell, rc::Rc};
-use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess, CpuBufferPool},
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
-    },
-    image::{
-        view::ImageView, ImageAccess,
-        SwapchainImage,
-    },
-    pipeline::{
-        graphics::{
-            viewport::{Viewport},
-        }, Pipeline, PipelineBindPoint,
-    },
-    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass},
-    swapchain::{
-        acquire_next_image, AcquireError, SwapchainCreateInfo, SwapchainCreationError,
-    },
-    sync::{self, FlushError, GpuFuture},
-};
-
+use rand::{thread_rng, Rng};
+use wgpu::{ include_wgsl, util::DeviceExt, TextureUsages};
 use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow},
-    window::{Window},
+    event::*,
+    event_loop::{ControlFlow, EventLoop},
+    window::{WindowBuilder, Window},
 };
-use crate::{view::renderer_init::*, controller::controller_input::{ControllerInput, MouseInputType}};
 
 
     // To create a buffer that will store the shape of our triangle.
@@ -42,439 +17,554 @@ use crate::{view::renderer_init::*, controller::controller_input::{ControllerInp
     pub struct Vertex {
         pub(crate) position: [f32; 2],
         pub(crate) tex_i: u32,
-        pub(crate) coords: [f32; 2],
+        pub(crate) tex_coords: [f32; 2],
     }
 
+//unsafe impl bytemuck::Pod for Vertex {}   use these for implementing Pod and Zeroable for structs, that cant derive these traits
+//unsafe impl bytemuck::Zeroable for Vertex {}
 
-
-    
-#[inline]
-pub(crate) fn vulkano_render(mut threads_vec : Vec<JoinHandle<()>>, running : Arc<AtomicBool>, controller_s: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: Handle) {
-    let mut ctr_sender = Some(controller_s);
-    let (device, queue, pipeline, images, render_pass, event_loop
-    , surface,mut swapchain, descriptor_set, immediary)
-     = init();
-    // Dynamic viewports allow us to recreate just the viewport when the window is resized
-    // Otherwise we would have to recreate the whole pipeline.
-    let mut viewport = Viewport {
-        origin: [0.0, 0.0],
-        dimensions: [0.0, 0.0],
-        depth_range: 0.0..1.0,
-    };
-
-    // The render pass we created above only describes the layout of our framebuffers. Before we
-    // can draw we also need to create the actual framebuffers.
-    //
-    // Since we need to draw to multiple images, we are going to create a different framebuffer for
-    // each image.
-    let mut framebuffers = window_size_dependent_setup(&images, render_pass.clone(), &mut viewport);
-
-    // Initialization is finally finished!
-
-    // In some situations, the swapchain will become invalid by itself. This includes for example
-    // when the window is resized (as the images of the swapchain will no longer match the
-    // window's) or, on Android, when the application went to the background and goes back to the
-    // foreground.
-    //
-    // In this situation, acquiring a swapchain image or presenting it will return an error.
-    // Rendering to an image of that swapchain will not produce any error, but may or may not work.
-    // To continue rendering, we need to recreate the swapchain by creating a new swapchain.
-    // Here, we remember that we need to do this for the next loop iteration.
-    let mut recreate_swapchain = false;
-
-    // In the loop below we are going to submit commands to the GPU. Submitting a command produces
-    // an object that implements the `GpuFuture` trait, which holds the resources for as long as
-    // they are in use by the GPU.
-    //
-    // Destroying the `GpuFuture` blocks until the GPU is finished executing it. In order to avoid
-    // that, we store the submission of the previous frame here.
-    let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
-
-    
-    surface.window().set_visible(true);
-
-    let mut old_call = SystemTime::now();
-
-
-    //Here, since the rendering thread has a reference to the window, it is necessary to check for input and then send this input to the controller
-    event_loop.run(move |event, _, control_flow| {
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
-                
-                running.store(false, std::sync::atomic::Ordering::SeqCst);
-                //dropping the sender will result in an Err Result on the controller thread recv() method
-                ctr_sender = None;
-                    (vertex_receiver).recv().unwrap();   //make the sender thread complete one more loop, in order to make it realize the running bool was set to false
-                
-                while let Some(cur_thread) = threads_vec.pop() {
-                    cur_thread.join().unwrap();
+//create a function that returns the descriptor for the vertex, that describes how the vertices are used
+impl Vertex {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,         //defines how wide a vertex is (C: sizeof()), in order to read the next vertex, the shader will read this many bytes further into the buffer
+            step_mode: wgpu::VertexStepMode::Vertex,                                    //how often the pipeline should move to the next vertex
+            attributes: &[
+                wgpu::VertexAttribute {                                                 //define general attributes of the vertices, here it is just a plain 1 to 1 attribution
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Uint32,
+                },
+                wgpu::VertexAttribute{
+                    offset: (std::mem::size_of::<[f32;2]>() + std::mem::size_of::<u32>()) as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
                 }
-                
-                *control_flow = ControlFlow::Exit;
-
-
-            }
-            Event::WindowEvent {
-                event: WindowEvent::Resized(phys_size),
-                ..
-            } => {
-                recreate_swapchain = true;
-                if let Some(controller_sender) = ctr_sender.clone(){
-                    let width = phys_size.width;
-                    let _height = phys_size.height;
-                    controller_sender.send(ControllerInput::WindowResized { dimensions: (width , phys_size.height )  }).expect("Could not send window resized info to the controller");
-                }
-            }
-            Event::WindowEvent {
-                event: WindowEvent::KeyboardInput { device_id: _ , input, is_synthetic: _ },
-                ..
-            } => {
-                //these if let statements are needed, since the ctr_sender is an option, meaning it can be dropped at runtime
-                //this dropping is used in order to stop the controller thread. (SEE above: ctr_sender = None;) This might not be strictly MVC here, but it saves a lot of overhead, since the Window has to be managed by the view here
-                if let Some(controller_sender) = ctr_sender.clone(){
-                    controller_sender.send(ControllerInput::KeyboardInput { key: input.virtual_keycode, state : input.state }).expect("Could not send keyboard input details to controller thread!");
-                }
-                
-            }
-            Event::WindowEvent {
-                event: WindowEvent::MouseInput { device_id: _, state , button: btn, .. },
-                ..
-            } => {
-                if let Some(controller_sender) = ctr_sender.clone(){
-                controller_sender.send(ControllerInput::MouseInput { action: MouseInputType::Click { button: btn, state: state } }).expect("Could not send mouse click input details to controller thread!");
-                }
-            }
-            Event::WindowEvent { 
-                 event: WindowEvent::CursorLeft { device_id: _ },
-                 ..
-                } 
-                => {
-                    if let Some(controller_sender) = ctr_sender.clone(){
-
-                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::LeftWindow }).expect("Could not send cursor left info to controller thread");
-                }   
-            }
-            Event::WindowEvent {  
-                event: WindowEvent::CursorEntered { device_id: _ } ,
-            ..
-            } => {
-                if let Some(controller_sender) = ctr_sender.clone(){
-
-                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::EnteredWindow }).expect("Could not send cursor entered info to controller thread");
-                }
-            }
-            Event::WindowEvent {  
-                event: WindowEvent::CursorMoved { device_id: _, position, .. },
-            ..
-            } => {
-
-                if let Some(controller_sender) = ctr_sender.clone(){
-                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Move(position.x as f32, position.y as f32) }).expect("Could not send mouse moved input details to controller thread");
-                }
-            }
-            Event::WindowEvent {
-                 event: WindowEvent::MouseWheel { device_id: _, delta, phase , ..},
-                .. 
-            } => {
-                if let Some(controller_sender) = ctr_sender.clone(){
-
-                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Scroll { delta, phase } }).expect("Could not send mouse wheel input details to controller thread");
-                }
-            }
-            Event::RedrawEventsCleared => {
-                
-
-                    let mut vertices = vertex_receiver.recv().expect("Received Error while trying to read from vertex sender!");
-
-                    if vertices.len() == 0{
-                        vertices = Vec::new();
-                        vertices.push(Vertex{
-                            ..Default::default()
-                        });
-                    }
-                        
-                    
-                    //safe the current state in the vertex_buffer for drawing
-                    let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices)
-                    .unwrap();
-           
-                                // Do not draw frame when screen dimensions are zero.
-                // On Windows, this can occur from minimizing the application.
-                let dimensions = surface.window().inner_size();
-                if dimensions.width == 0 || dimensions.height == 0 {
-                    return;
-                }
-
-
-                // It is important to call this function from time to time, otherwise resources will keep
-                // accumulating and you will eventually reach an out of memory error.
-                // Calling this function polls various fences in order to determine what the GPU has
-                // already processed, and frees the resources that are no longer needed.
-                previous_frame_end.as_mut().unwrap().cleanup_finished();
-
-
-
-                //println!("VP0: {}", vertices[0].position[0]);
-                // Whenever the window resizes we need to recreate everything dependent on the window size.
-                // In this example that includes the swapchain, the framebuffers and the dynamic state viewport.
-                if recreate_swapchain {
-                    // Use the new dimensions of the window.
-
-                    let (new_swapchain, new_images) =
-                        match swapchain.recreate(SwapchainCreateInfo {
-                            image_extent: dimensions.into(),
-                            ..swapchain.create_info()
-                        }) {
-                            Ok(r) => r,
-                            // This error tends to happen when the user is manually resizing the window.
-                            // Simply restarting the loop is the easiest way to fix this issue.
-                            Err(SwapchainCreationError::ImageExtentNotSupported { .. }) => return,
-                            Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
-                        };
-
-                    swapchain = new_swapchain;
-                    // Because framebuffers contains an Arc on the old swapchain, we need to
-                    // recreate framebuffers as well.
-                    framebuffers = window_size_dependent_setup(
-                        &new_images,
-                        render_pass.clone(),
-                        &mut viewport,
-                    );
-                    recreate_swapchain = false;
-                }
-            
-
-
-
-               
-
-
-                // Before we can draw on the output, we have to *acquire* an image from the swapchain. If
-                // no image is available (which happens if you submit draw commands too quickly), then the
-                // function will block.
-                // This operation returns the index of the image that we are allowed to draw upon.
-                //
-                // This function can block if no image is available. The parameter is an optional timeout
-                // after which the function call will return an error.
-                let (image_num, suboptimal, acquire_future) =
-                    match acquire_next_image(swapchain.clone(), None) {
-                        Ok(r) => r,
-                        Err(AcquireError::OutOfDate) => {
-                            recreate_swapchain = true;
-                            return;
-                        }
-                        Err(e) => panic!("Failed to acquire next image: {:?}", e),
-                    };
-
-                // acquire_next_image can be successful, but suboptimal. This means that the swapchain image
-                // will still work, but it may not display correctly. With some drivers this can be when
-                // the window resizes, but it may not cause the swapchain to become out of date.
-                if suboptimal {
-                    recreate_swapchain = true;
-                }
-
-
-                // In order to draw, we have to build a *command buffer*. The command buffer object holds
-                // the list of commands that are going to be executed.
-                //
-                // Building a command buffer is an expensive operation (usually a few hundred
-                // microseconds), but it is known to be a hot path in the driver and is expected to be
-                // optimized.
-                //
-                // Note that we have to pass a queue family when we create the command buffer. The command
-                // buffer will only be executable on that given queue family.
-                let mut builder = AutoCommandBufferBuilder::primary(
-                    device.clone(),
-                    queue.family(),
-                    CommandBufferUsage::OneTimeSubmit,      //oneTimeSubmit is more optimized and applicable, since we create a new one every frame
-                )
-                .unwrap();
-
-
-                builder
-                    // Before we can draw, we have to *enter a render pass*.
-                    .begin_render_pass(
-                        RenderPassBeginInfo {
-                            // A list of values to clear the attachments with. This list contains
-                            // one item for each attachment in the render pass. In this case,
-                            // there is only one attachment, and we clear it with a blue color.
-                            //
-                            // Only attachments that have `LoadOp::Clear` are provided with clear
-                            // values, any others should use `ClearValue::None` as the clear value.
-                            clear_values: vec![Some([0.4, 0.4, 0.4, 0.0].into())],
-                            ..RenderPassBeginInfo::framebuffer(framebuffers[image_num].clone())
-                        },
-                        // The contents of the first (and only) subpass. This can be either
-                        // `Inline` or `SecondaryCommandBuffers`. The latter is a bit more advanced
-                        // and is not covered here.
-                        SubpassContents::Inline,
-                    )
-                    .unwrap()
-                    // We are now inside the first subpass of the render pass. We add a draw command.
-                    //
-                    // The last two parameters contain the list of resources to pass to the shaders.
-                    // Since we used an `EmptyPipeline` object, the objects have to be `()`.
-                    .set_viewport(0, [viewport.clone()])
-                    .bind_pipeline_graphics(pipeline.clone())
-                    .bind_descriptor_sets(
-                        PipelineBindPoint::Graphics,
-                        pipeline.layout().clone(),
-                        0,
-                        descriptor_set.clone(),
-                    )
-                    .bind_vertex_buffers(0, vertex_buffer.clone())
-                    .draw(vertex_buffer.len() as u32, 1, 0, 0)
-                    .unwrap()
-                    // We leave the render pass by calling `draw_end`. Note that if we had multiple
-                    // subpasses we could have called `next_inline` (or `next_secondary`) to jump to the
-                    // next subpass.
-                    .end_render_pass()
-                    .unwrap();
-
-                // Finish building the command buffer by calling `build`.
-                let command_buffer = builder.build().unwrap();
-                
-
-
-                let future = previous_frame_end
-                    .take()
-                    .unwrap()
-                    .join(acquire_future)
-                    .then_execute(queue.clone(), command_buffer)
-                    .unwrap()
-                    // The color output is now expected to contain our triangle. But in order to show it on
-                    // the screen, we have to *present* the image by calling `present`.
-                    //
-                    // This function does not actually present the image immediately. Instead it submits a
-                    // present command at the end of the queue. This means that it will only be presented once
-                    // the GPU has finished executing the command buffer that draws the triangle.
-                    .then_swapchain_present(queue.clone(), swapchain.clone(), image_num)
-                    .then_signal_fence_and_flush();
-                    
-
-                match future {
-                    Ok(future) => {
-                        previous_frame_end = Some(future.boxed());
-                    }
-                    Err(FlushError::OutOfDate) => {
-                        recreate_swapchain = true;
-                        previous_frame_end = Some(sync::now(device.clone()).boxed());
-                    }
-                    Err(e) => {
-                        println!("Failed to flush future: {:?}",    e);
-                        previous_frame_end = Some(sync::now(device.clone()).boxed());
-                    }
-                }
-
-
-
-            
-
-
-            }
-            
-
-            Event::MainEventsCleared => {
-
-                
-
-                /*
-                let now_time = SystemTime::now();
-                let _time_diff = now_time.duration_since(last_change);
-                last_change = SystemTime::now();
-
-                println!("{:?}", _time_diff);
-                */
-                
-            }
-            _ => (),
+            ]
         }
+    }
+}
+struct State {
+    surface: wgpu::Surface,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    size: winit::dpi::PhysicalSize<u32>,
+
+    render_pipeline: wgpu::RenderPipeline,  //The render pipeline is needed for drawing onto a surface, using shaders
+    vertex_buffer: wgpu::Buffer,
+    diffuse_bind_group: wgpu::BindGroup, 
+
+    bkcolor: wgpu::Color,
+    last_render: SystemTime,
+    vertices: Vec<Vertex>,
+}
+
+impl State {
+
+    // Creating some of the wgpu types requires async code
+    // in order to use these, the new function needs to be async und thus the whole rendering function, but since it does not return anything, we need pollster in main to block and wait
+    async fn new(window: &Window) -> Self {
+
+        let size = window.inner_size();
+
+        // The instance is a handle to our GPU
+        // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
+        let instance = wgpu::Instance::new(wgpu::Backends::VULKAN);
+        let surface = unsafe { instance.create_surface(window) };
+        let adapter = instance.request_adapter(
+            &wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            },
+        ).await.unwrap();   
+        let (device, queue) = adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                features: (wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER | /* <-- this is a bitwise operator, not a logical OR */ wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
+                | wgpu::Features::TEXTURE_BINDING_ARRAY),            //you can get a list of supported features by calling adapter.features() or device.features()
+
+                limits: wgpu::Limits::default(),
+                
+                label: None,
+            },
+            None, // Trace path
+        ).await.unwrap();
+
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface.get_preferred_format(&adapter).unwrap(),
+            width: size.width,                      //should not be 0, otherwise it might crash
+            height: size.height,                    //should not be 0, otherwise it might crash
+            present_mode: wgpu::PresentMode::Fifo,           //Fifo corresponds to V-Sync, waiting for refresh, Mailbox will stop visible tearing, but impact performance slightly, immediate fastest, but with some tearing
+        };
+        surface.configure(&device, &config);
+
+
+        //loading an image from a file
+        let diffuse_bytes = include_bytes!("../../textures/image_img.png");
+        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
+        let diffuse_rgba = diffuse_image.to_rgba8();
+
+        use image::GenericImageView;
+        let dimensions = diffuse_image.dimensions();
+
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+
+        let diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
+
+            label: Some("distinct texture"),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::COPY_DST | TextureUsages::COPY_SRC | TextureUsages::TEXTURE_BINDING,
+            
+        });
+
+        //this execute a write on the gpu from the loaded image pixel data into our created texture
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            diffuse_rgba.into_raw().as_slice(),
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
+        );
+
+
+        let diffuse_bytes = include_bytes!("../../textures/Dwarf_BaseHouse.png");
+        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
+        let diffuse_rgba = diffuse_image.to_rgba8();
+
+        let dimensions = diffuse_image.dimensions();
+
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+
+        let second_diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
+
+            label: Some("distinct texture"),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::COPY_DST | TextureUsages::COPY_SRC | TextureUsages::TEXTURE_BINDING,
+            
+        });
+        
+        //this execute a write on the gpu from the loaded image pixel data into our created texture
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &second_diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            diffuse_rgba.into_raw().as_slice(),
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
+        );
+        
+
+/*      This is another way to load an image, but it is not as easy to use as the one above (not as flexible), tho more slim
+    
+        let diffuse_texture = {
+            let img_data = include_bytes!("../image_img.png");
+            let decoder = png::Decoder::new(std::io::Cursor::new(img_data));
+            let mut reader = decoder.read_info().unwrap();
+            let mut buf = vec![0; reader.output_buffer_size()];
+            let info = reader.next_frame(&mut buf).unwrap();
+
+            let size = wgpu::Extent3d {
+                width: info.width,
+                height: info.height,
+                depth_or_array_layers: 1,
+            };
+            let texture_format = wgpu::TextureFormat::Rgba8UnormSrgb;
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: None,
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: texture_format,
+                usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+            });
+            queue.write_texture(
+                texture.as_image_copy(),
+                &buf,
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: std::num::NonZeroU32::new(info.width * 4),
+                    rows_per_image: None,
+                },
+                size,
+            );
+            texture
+        };*/
+
+
+
+        // We don't need to configure the texture view much, so let's
+        // let wgpu define it.
+        let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());        //create a handle to access the texture we just created
+        let second_diffuse_texture_view = second_diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());        //create a handle to access the texture we just created
+        
+        let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {                                      //a sampler will accept coordinates (X/Y) and return the color data. So this object is asked when the texture is the source of any color operation
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()                        //rest of the fields are initialized with default values
+        });
+
+
+        
+        let texture_view_array = [
+            &diffuse_texture_view,
+            &second_diffuse_texture_view,
+        ];
+
+        //bind groups describe resources that a shaders has access to
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[                     //2 Entries: 1st: Texture, 2nd: Sampler for texture
+                    wgpu::BindGroupLayoutEntry {    
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: NonZeroU32::new(2),
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        // This should match the filterable field of the
+                        // corresponding Texture entry above.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
+
+
+            //create the actual bind group based on the bind-group-layout. This looks almost identical tho, but it means you could switch these out
+            let diffuse_bind_group = device.create_bind_group(
+                &wgpu::BindGroupDescriptor {
+                    layout: &texture_bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureViewArray(&texture_view_array),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
+                        }
+                    ],
+                    label: Some("diffuse_bind_group"),
+                }
+            );
+            
+
+
+        let shader = device.create_shader_module(&include_wgsl!("shader.wgsl"));       //here, we could also put the contents of shader.wgsl as a String into the program, but loading it from a file is more convenient. Make sure to have WGSL extension installed if you want to edit the shader.wgsl file
+        
+
+        let render_pipeline_layout =
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[&texture_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main", // 1.
+                buffers: &[
+                    Vertex::desc(),                                 //insert the vertex buffer that was created above
+                ], // 2.
+            },
+            fragment: Some(wgpu::FragmentState { // 3.              //fragment is optional and thus wrapped in Some(), this is needed for storing color on the surface
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[wgpu::ColorTargetState { // 4.
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),         //replace pixels instead of blending
+                    write_mask: wgpu::ColorWrites::ALL,             //specify color channels (R, G, B or similiar) that can be written to. Others will be ignored 
+                }],
+            }),    
+                primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList, // 1.  //every 3 vertices in order are considered a triangle
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw, // 2.            //Ccw: Counter-clockwise. This means, that if the vertices are ordered counter-clockwise, the triangle is facing us (only the front is visible)
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },    depth_stencil: None, // 1.
+            multisample: wgpu::MultisampleState {
+                count: 1, // 2.
+                mask: !0, // 3.
+                alpha_to_coverage_enabled: false, // 4.
+            },
+            multiview: None, // 5.
+        });
+
+            //create the actual vertices that should be drawn. This could be updated at compile time
+    let vertices: Vec<Vertex> = vec!(
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
+        Vertex { position: [-0.0, 1.0],  tex_i: 0, tex_coords: [0.0, 0.0], }, 
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], }, 
+        Vertex { position: [1.0, 0.0],  tex_i: 0, tex_coords: [0.5, 0.5], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
+
+
+    );
+
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let moment = SystemTime::now();
+
+
+            
+        Self {
+            surface,
+            device,
+            queue,
+            config,
+            size,
+            bkcolor: wgpu::Color {            
+                r: 0.1,
+                g: 0.2,
+                b: 0.3,
+                a: 1.0,
+            },
+            render_pipeline: render_pipeline,
+            vertex_buffer: vertex_buffer,
+            last_render: moment,
+            diffuse_bind_group: diffuse_bind_group,
+            vertices
+        }
+    }
+     
+
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.size = new_size;
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config);
+        }
+    }
+
+    fn input(&mut self, event: &WindowEvent) -> bool {
+
+        
+        match event {
+            WindowEvent::CursorMoved { device_id: _, position: _, modifiers: _ } =>{
+                let mut rng = thread_rng();
+                let val_changed = rng.gen_range(-0.005..=0.005);
+                let typechanged : u8 = rng.gen_range(0..=2);
+                match typechanged {
+                    0 => self.bkcolor.r += val_changed,
+                    1 => self.bkcolor.g +=val_changed,
+                    2 => self.bkcolor.b += val_changed,
+                    _ => ()
+                    
+                }
+            }
+            WindowEvent::KeyboardInput { input: keyboard_input, .. } => {
+                if let winit::event::KeyboardInput {
+                    virtual_keycode: Some(keycode),
+                    state: winit::event::ElementState::Pressed,
+                    ..
+                } = keyboard_input
+                {
+                    match keycode {
+                        winit::event::VirtualKeyCode::Escape => panic!("Exiting"),
+                        _ => (),
+                    }
+                }
+            }
+            
+            _ => ()
+        }
+        false
+    }
+
+    fn update(&mut self) {
+    }
+
+    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+
+        
+        //check for performance, this is only loosely true, since these actions are not 0 cost, but might be enough for now.
+        //16.6ms are needed for 60fps (that is 16666 qs)
+        let now = SystemTime::now();
+
+        let time_passed_in_ms = self.last_render.elapsed().unwrap().as_micros();
+
+        println!("qs passed since last rendering: {}", time_passed_in_ms);
+        self.last_render = now;
+
+
+
+        //get the frame to render to
+        let output = self.surface.get_current_texture()?;
+
+        //this is a handle to a texture that can be computed
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        //an encoder is needed to construct the actual commands that get submitted to the gpu
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+
+        //a render pass is a part of a program in which the given view is drawn to.
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {          //color attachments describe where we are going to draw to
+                view: &view,                                                //created view as target, to render to the screen, this generally is the texture destination of the colors
+                resolve_target: None,                                       //texture that will receive the resolved output, this is the same as view unless multisampling is enabled
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(self.bkcolor),
+                    store: true,
+                },
+
+            }],
+            depth_stencil_attachment: None,
+        });
+            // NEW!
+        render_pass.set_pipeline(&self.render_pipeline); // 2.
+        render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);   
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.draw(0..(self.vertices.len() as u32), 0..1);
+
+        drop(render_pass);                     //this is needed, because in the previous step, the _render_pass object borrowed encoder mutably,
+                                                //  and thus we need to drop that borrow in order to use the encoder in the next step
+
+            // submit will accept anything that implements IntoIter
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+
+
+        Ok(())
+    }
+}
+
+pub(crate) async fn wgpu_render(running: Arc<RwLock<bool>>, mut threads_vec: Vec<JoinHandle<()>>){
+    env_logger::init();
+    let event_loop = EventLoop::new();
+
+    let window = WindowBuilder::new().with_title("Driven UnderGround!").with_visible(true).build(&event_loop).unwrap();
+    
+    let state_future = State::new(&window);
+    let mut state = state_future.await;
+
+
+    event_loop.run(move |event, _, control_flow| match event {
+        Event::RedrawRequested(window_id) if window_id == window.id() => {
+            //we could trigger this Event by calling window.request_redraw(), for example in MainEventsCleared, but rendering right there is faster due to reduced function overhead
+        }
+        Event::WindowEvent {
+            ref event,
+            window_id,
+        } if window_id == window.id() => if !state.input(event) {match event {
+            //These Window-Events are prebaked, we only need to know which ones to respond to and how
+            WindowEvent::Resized(physical_size) => {
+                state.resize(*physical_size);
+            }
+            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                // new_inner_size is &&mut so we have to dereference it twice
+                state.resize(**new_inner_size);
+            }
+            WindowEvent::CloseRequested
+            | WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state: ElementState::Pressed,
+                        virtual_keycode: Some(VirtualKeyCode::Escape),
+                        ..
+                    },
+                ..
+            } => {
+                *running.write().unwrap() = false;                          //because no reference to running is saved, the lock is dropped immediately
+                while let Some(thr) = threads_vec.pop(){
+                    thr.join().unwrap();
+                }
+                *control_flow = ControlFlow::Exit
+            },
+            _ => {}
+        }
+
+    }
+    Event::MainEventsCleared => {
+
+        //this event will be continuously submitted
+        state.update();
+        match state.render() {
+            Ok(_) => {}
+            // Reconfigure the surface if lost
+            Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
+            // The system is out of memory, we should probably quit
+            Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+            // All other errors (Outdated, Timeout) should be resolved by the next frame
+            Err(e) => eprintln!("{:?}", e),
+        }
+    }
+        _ => {}
     });
 }
-
-/// This method is called once during initialization, then again whenever the window is resized
-#[inline(always)]
-fn window_size_dependent_setup(
-    images: &[Arc<SwapchainImage<Window>>],
-    render_pass: Arc<RenderPass>,
-    viewport: &mut Viewport,
-) -> Vec<Arc<Framebuffer>> {
-    let dimensions = images[0].dimensions().width_height();
-    viewport.dimensions = [dimensions[0] as f32, dimensions[1] as f32];
-
-    images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new_default(image.clone()).unwrap();
-            Framebuffer::new(
-                render_pass.clone(),
-                FramebufferCreateInfo {
-                    attachments: vec![view],
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>()
-}
-
-
-
-
-    // The raw shader creation API provided by the vulkano library is unsafe, for various reasons.
-    //
-    // An overview of what the `shader!` macro generates can be found in the
-    // `vulkano-shaders` crate docs. You can view them at https://docs.rs/vulkano-shaders/
-    //
-    // TODO: explain this in details
-
-    //the vec4(position, 0.0, 1.0) puts the vertex at the specified index, while zooming out by a factor of 1. Changing the 1.0 will zoom inwards or outwards
-    pub(crate) mod vs {
-        vulkano_shaders::shader! {
-            ty: "vertex",
-            src: "
-            #version 450
-            
-            layout(location = 0) in vec2 position;
-            layout(location = 1) in uint tex_i;
-            layout(location = 2) in vec2 coords;
-            
-            layout(location = 0) out flat uint out_tex_i;
-            layout(location = 1) out vec2 out_coords;
-            
-            void main() {
-                gl_Position = vec4(position, 0.0, 1.0);
-                out_tex_i = tex_i;
-                out_coords = coords;
-            }"
-        }
-    }
-
-    pub(crate) mod fs {
-        vulkano_shaders::shader! {
-            ty: "fragment",
-            src: "
-            #version 450
-            
-            #extension GL_EXT_nonuniform_qualifier : enable
-            
-            layout(location = 0) in flat uint tex_i;
-            layout(location = 1) in vec2 coords;
-            
-            layout(location = 0) out vec4 f_color;
-            
-            layout(set = 0, binding = 0) uniform sampler2D tex[];
-            
-            void main() {
-                f_color = texture(tex[tex_i], coords);
-            }"
-        }
-    }
-
-
-
-
-

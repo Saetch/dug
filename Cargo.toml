@@ -11,17 +11,13 @@ winit = "0.26.1"
 env_logger = "0.9"
 bytemuck = { version = "1.9.1", features = ["derive"] }
 cgmath = "0.18"
-png = "0.17"
 jpeg-decoder = "0.2.6"
 serde = { version = "1.0", features = ["derive"] }
 ron = "0.7"
 log = "0.4"
-
 wgpu = {git = "https://github.com/gfx-rs/wgpu" }
 png = "*"
-pollster = "0.2.5"      #can poll stuff, wait for async returns in synchronous code
 image = { version = "0.24.2", features = ["png", "jpeg"] }
-
 flume = "*" #flume for fast cross-threading channels. Unlike crossbeam-channels, flume is entirely in safe Rust
 pollster = "0.2.5"      #can poll stuff, wait for async returns in synchronous code
 spin_sleep = "1.1.1"
