@@ -11,7 +11,7 @@ winit = "0.26.1"
 env_logger = "0.9"
 bytemuck = { version = "1.9.1", features = ["derive"] }
 log = "0.4"
-wgpu = "0.12"
+wgpu = {git = "https://github.com/gfx-rs/wgpu" }
 png = "*"
 pollster = "0.2.5"      #can poll stuff, wait for async returns in synchronous code
 image = { version = "0.24.2", features = ["png", "jpeg"] }

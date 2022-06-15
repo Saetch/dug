@@ -1,7 +1,7 @@
-use std::{sync::{RwLock, Arc}, thread::JoinHandle, time::SystemTime};
+use std::{sync::{RwLock, Arc}, thread::JoinHandle, time::SystemTime, num::NonZeroU32, default};
 use bytemuck::{Pod, Zeroable};
 use rand::{thread_rng, Rng};
-use wgpu::{ include_wgsl, util::DeviceExt};
+use wgpu::{ include_wgsl, util::DeviceExt, TextureUsages};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -86,7 +86,8 @@ impl State {
         ).await.unwrap();   
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
-                features: wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,            //you can get a list of supported features by calling adapter.features() or device.features()
+                features: (wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER | /* <-- this is a bitwise operator, not a logical OR */ wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
+                | wgpu::Features::TEXTURE_BINDING_ARRAY),            //you can get a list of supported features by calling adapter.features() or device.features()
 
                 limits: wgpu::Limits::default(),
                 
@@ -101,7 +102,7 @@ impl State {
             format: surface.get_preferred_format(&adapter).unwrap(),
             width: size.width,                      //should not be 0, otherwise it might crash
             height: size.height,                    //should not be 0, otherwise it might crash
-            present_mode: wgpu::PresentMode::Mailbox,           //Fifo corresponds to V-Sync, waiting for refresh, Mailbox will stop visible tearing, but impact performance slightly, immediate fastest, but with some tearing
+            present_mode: wgpu::PresentMode::Fifo,           //Fifo corresponds to V-Sync, waiting for refresh, Mailbox will stop visible tearing, but impact performance slightly, immediate fastest, but with some tearing
         };
         surface.configure(&device, &config);
 
@@ -120,7 +121,86 @@ impl State {
             depth_or_array_layers: 1,
         };
 
+        let diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
 
+            label: Some("distinct texture"),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::COPY_DST | TextureUsages::COPY_SRC | TextureUsages::TEXTURE_BINDING,
+            
+        });
+
+        //this execute a write on the gpu from the loaded image pixel data into our created texture
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            diffuse_rgba.into_raw().as_slice(),
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
+        );
+
+
+        let diffuse_bytes = include_bytes!("../explain_output.png");
+        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
+        let diffuse_rgba = diffuse_image.to_rgba8();
+
+        let dimensions = diffuse_image.dimensions();
+
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+
+        let second_diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
+
+            label: Some("distinct texture"),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::COPY_DST | TextureUsages::COPY_SRC | TextureUsages::TEXTURE_BINDING,
+            
+        });
+        
+        //this execute a write on the gpu from the loaded image pixel data into our created texture
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &second_diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            diffuse_rgba.into_raw().as_slice(),
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
+        );
+        
+
+/*      This is another way to load an image, but it is not as easy to use as the one above (not as flexible), tho more slim
+    
         let diffuse_texture = {
             let img_data = include_bytes!("../image_img.png");
             let decoder = png::Decoder::new(std::io::Cursor::new(img_data));
@@ -154,33 +234,15 @@ impl State {
                 size,
             );
             texture
-        };
+        };*/
 
 
-
-        queue.write_texture(
-            // Tells wgpu where to copy the pixel data
-            wgpu::ImageCopyTexture {
-                texture: &diffuse_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            // The actual pixel data
-            diffuse_rgba.into_raw().as_slice(),
-            // The layout of the texture
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
-                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
-            },
-            texture_size,
-        );
-        
 
         // We don't need to configure the texture view much, so let's
         // let wgpu define it.
         let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());        //create a handle to access the texture we just created
+        let second_diffuse_texture_view = second_diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());        //create a handle to access the texture we just created
+        
         let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {                                      //a sampler will accept coordinates (X/Y) and return the color data. So this object is asked when the texture is the source of any color operation
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -190,6 +252,13 @@ impl State {
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()                        //rest of the fields are initialized with default values
         });
+
+
+        
+        let texture_view_array = [
+            &diffuse_texture_view,
+            &second_diffuse_texture_view,
+        ];
 
         //bind groups describe resources that a shaders has access to
         let texture_bind_group_layout =
@@ -203,7 +272,7 @@ impl State {
                             view_dimension: wgpu::TextureViewDimension::D2,
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         },
-                        count: None,
+                        count: NonZeroU32::new(2),
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
@@ -225,7 +294,7 @@ impl State {
                     entries: &[
                         wgpu::BindGroupEntry {
                             binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&diffuse_texture_view),
+                            resource: wgpu::BindingResource::TextureViewArray(&texture_view_array),
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
@@ -290,12 +359,12 @@ impl State {
 
             //create the actual vertices that should be drawn. This could be updated at compile time
     let vertices: Vec<Vertex> = vec!(
-        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 1.0], },
-        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [1.0, 0.0], }, 
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
         Vertex { position: [-0.0, 1.0],  tex_i: 0, tex_coords: [0.0, 0.0], }, 
-        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 1.0], }, 
-        Vertex { position: [1.0, 0.0],  tex_i: 0, tex_coords: [1.0, 1.0], },
-        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [1.0, 0.0], }, 
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], }, 
+        Vertex { position: [1.0, 0.0],  tex_i: 0, tex_coords: [0.5, 0.5], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
 
 
     );
