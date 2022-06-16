@@ -10,7 +10,7 @@ use winit::{
     window::{WindowBuilder, Window},
 };
 
-use crate::controller::controller_input::ControllerInput;
+use crate::controller::controller_input::{ControllerInput, MouseInputType};
 
 use super::renderer_init::{self};
 
@@ -59,6 +59,7 @@ impl Vertex {
 
 pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: Arc<AtomicBool>, controller_sender: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: Handle) {
     env_logger::init();
+    let mut ctr_sender = Some(controller_sender);
     let event_loop = EventLoop::new();
 
     let window = WindowBuilder::new().with_title("Driven UnderGround!").with_visible(true).build(&event_loop).unwrap();
@@ -105,21 +106,62 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
                 }
             }
             WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        state: ElementState::Pressed,
-                        virtual_keycode: Some(VirtualKeyCode::Escape),
-                        ..
-                    },
-                ..
-            } => {
-                running.store(false, std::sync::atomic::Ordering::SeqCst);                          //because no reference to running is saved, the lock is dropped immediately
-                while let Some(thr) = threads_vec.pop(){
-                    thr.join().unwrap();
+             => {
+                running.store(false, std::sync::atomic::Ordering::SeqCst);
+                //dropping the sender will result in an Err Result on the controller thread recv() method
+                ctr_sender = None;
+                    (vertex_receiver).recv().unwrap();   //make the sender thread complete one more loop, in order to make it realize the running bool was set to false
+                
+                while let Some(cur_thread) = threads_vec.pop() {
+                    cur_thread.join().unwrap();
                 }
-                *control_flow = ControlFlow::Exit
-            },
+                
+                *control_flow = ControlFlow::Exit;
+
+            }
+           WindowEvent::KeyboardInput { device_id: _ , input, is_synthetic: _ }
+             => {
+            //these if let statements are needed, since the ctr_sender is an option, meaning it can be dropped at runtime
+            //this dropping is used in order to stop the controller thread. (SEE above: ctr_sender = None;) This might not be strictly MVC here, but it saves a lot of overhead, since the Window has to be managed by the view here
+            if let Some(controller_sender) = ctr_sender.clone(){
+                controller_sender.send(ControllerInput::KeyboardInput { key: input.virtual_keycode, state : input.state }).expect("Could not send keyboard input details to controller thread!");
+            }
+            
+        }
+            WindowEvent::MouseInput { device_id: _, state , button: btn, .. }
+             => {
+                if let Some(controller_sender) = ctr_sender.clone(){
+                controller_sender.send(ControllerInput::MouseInput { action: MouseInputType::Click { button: *btn, state: *state } }).expect("Could not send mouse click input details to controller thread!");
+                }
+            }
+            WindowEvent::CursorLeft { device_id: _ }
+             => {
+                    if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::LeftWindow }).expect("Could not send cursor left info to controller thread");
+                }   
+            }
+            WindowEvent::CursorEntered { device_id: _ }
+             => {
+                if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::EnteredWindow }).expect("Could not send cursor entered info to controller thread");
+                }
+            }
+            WindowEvent::CursorMoved { device_id: _, position, .. }
+             => {
+
+                if let Some(controller_sender) = ctr_sender.clone(){
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Move(position.x as f32, position.y as f32) }).expect("Could not send mouse moved input details to controller thread");
+                }
+            }
+            WindowEvent::MouseWheel { device_id: _, delta, phase , ..}
+             => {
+                if let Some(controller_sender) = ctr_sender.clone(){
+
+                controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Scroll { delta: *delta, phase: *phase } }).expect("Could not send mouse wheel input details to controller thread");
+                }
+            }
             _ => {}
         }
 
@@ -142,7 +184,7 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
         //get the frame to render to
         let output = surface.get_current_texture();
         if output.is_err() {
-            return ;
+            return;
         }
         let output = output.unwrap();
         //this is a handle to a texture that can be computed
