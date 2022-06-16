@@ -1,12 +1,16 @@
-use std::{sync::{RwLock, Arc}, thread::JoinHandle, time::SystemTime, num::NonZeroU32, default};
+use std::{sync::{RwLock, Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime, num::NonZeroU32, default};
 use bytemuck::{Pod, Zeroable};
+use flume::{Sender, Receiver};
 use rand::{thread_rng, Rng};
+use tokio::runtime::{Runtime, Handle};
 use wgpu::{ include_wgsl, util::DeviceExt, TextureUsages};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{WindowBuilder, Window},
 };
+
+use crate::controller::controller_input::ControllerInput;
 
 
     // To create a buffer that will store the shape of our triangle.
@@ -505,7 +509,7 @@ impl State {
     }
 }
 
-pub(crate) async fn wgpu_render(running: Arc<RwLock<bool>>, mut threads_vec: Vec<JoinHandle<()>>){
+pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: Arc<AtomicBool>, controller_sender: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: Handle) {
     env_logger::init();
     let event_loop = EventLoop::new();
 
@@ -541,7 +545,7 @@ pub(crate) async fn wgpu_render(running: Arc<RwLock<bool>>, mut threads_vec: Vec
                     },
                 ..
             } => {
-                *running.write().unwrap() = false;                          //because no reference to running is saved, the lock is dropped immediately
+                running.store(false, std::sync::atomic::Ordering::SeqCst);                          //because no reference to running is saved, the lock is dropped immediately
                 while let Some(thr) = threads_vec.pop(){
                     thr.join().unwrap();
                 }
