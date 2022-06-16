@@ -12,7 +12,7 @@ pub struct DebugObject{
 
 impl DebugObject{
     #[allow(dead_code)]
-    pub fn new(position: (f64, f64), tex_i : u32) -> Self{
+    pub fn new(position: (f64, f64), _tex_i : u32) -> Self{
         DebugObject { position, tex_i: 0, size: 0.4 }
     }    
     #[allow(dead_code)]

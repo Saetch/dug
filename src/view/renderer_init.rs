@@ -1,9 +1,9 @@
-use std::{num::NonZeroU32, time::SystemTime};
 
-use wgpu::{TextureUsages, include_wgsl, util::DeviceExt, SurfaceConfiguration, Surface, Device, RenderPipeline, BindGroup, Queue};
+
+use wgpu::{include_wgsl, SurfaceConfiguration, Surface, Device, RenderPipeline, BindGroup, Queue};
 use winit::{window::Window, dpi::PhysicalSize};
 
-use super::{renderer::{Vertex, self}, sprite_loading};
+use super::{sprite_loading};
 
 
 

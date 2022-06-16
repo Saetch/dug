@@ -4,7 +4,7 @@ use wgpu::{TextureUsages, Device, RenderPipeline, BindGroup, ShaderModule, Surfa
 
 use crate::view::renderer::Vertex;
 
-pub fn load_sprites(i: u32, device: &Device, queue: &wgpu::Queue, shader: &ShaderModule, config: &SurfaceConfiguration) -> (RenderPipeline, BindGroup) {
+pub fn load_sprites(_i: u32, device: &Device, queue: &wgpu::Queue, shader: &ShaderModule, config: &SurfaceConfiguration) -> (RenderPipeline, BindGroup) {
 
             
 

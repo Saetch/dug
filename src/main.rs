@@ -1,10 +1,10 @@
-use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, RwLock}, cell::RefCell, rc::Rc};
+use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, RwLock}};
 use constants::{WINDOW_INIT_X, WINDOW_INIT_Y};
 use controller::{controller_input::ControllerInput, controller::handle_communication_loop, game_state::GameState};
 use flume::Receiver;
 extern crate jpeg_decoder as jpeg;
 use model::{model::{ Model}};
-use tokio::{runtime::{Runtime, Handle}, sync::{oneshot::{ self}, Mutex}};
+use tokio::{runtime::{Handle}};
 use view::renderer::Vertex;
 use crate::{view::renderer::wgpu_render, controller::controller::handle_input_loop};
 mod controller;

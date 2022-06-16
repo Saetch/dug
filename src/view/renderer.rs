@@ -1,13 +1,13 @@
-use std::{sync::{RwLock, Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime, num::NonZeroU32, default};
+use std::{sync::{Arc, atomic::AtomicBool}, thread::JoinHandle, time::SystemTime};
 use bytemuck::{Pod, Zeroable};
 use flume::{Sender, Receiver};
-use rand::{thread_rng, Rng};
-use tokio::runtime::{Runtime, Handle};
-use wgpu::{ include_wgsl, util::DeviceExt, TextureUsages};
+
+use tokio::runtime::{Handle};
+use wgpu::{ util::DeviceExt};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::{WindowBuilder, Window}, dpi::{Size, PhysicalSize},
+    window::{WindowBuilder}, dpi::{Size, PhysicalSize},
 };
 
 use crate::{controller::controller_input::{ControllerInput, MouseInputType}, constants::{WINDOW_INIT_X, WINDOW_INIT_Y}};
@@ -57,7 +57,7 @@ impl Vertex {
 }
 
 
-pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: Arc<AtomicBool>, controller_sender: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, rt: Handle) {
+pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: Arc<AtomicBool>, controller_sender: Sender<ControllerInput>, vertex_receiver: Receiver<Vec<Vertex>>, _rt: Handle) {
     env_logger::init();
     let mut ctr_sender = Some(controller_sender);
     let event_loop = EventLoop::new();
@@ -175,7 +175,7 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
         //16.6ms are needed for 60fps (that is 16666 qs)
         let now = SystemTime::now();
 
-        let time_passed_in_ms = last_render.elapsed().unwrap().as_micros();
+        let _time_passed_in_ms = last_render.elapsed().unwrap().as_micros();
 
         //println!("qs passed since last rendering: {}", time_passed_in_ms);
         last_render = now;
