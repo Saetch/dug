@@ -241,10 +241,10 @@ pub fn load_sprites(i: u32, device: &Device, queue: &wgpu::Queue, shader: &Shade
     
                     
             let texture_view_array = [
-                &dwarf_base_house_texture_view,
-                &rust_logo_diffuse_texture_view,
-                &background1_cracked_floor_texture_view,
-                &background1_cracked_no_floor_texture_view,
+                &dwarf_base_house_texture_view,             //tex_i index: 0 
+                &rust_logo_diffuse_texture_view,            //tex_i index: 1
+                &background1_cracked_floor_texture_view,    //tex_i index: 2    
+                &background1_cracked_no_floor_texture_view, //tex_i index: 3
             ];
 
 
