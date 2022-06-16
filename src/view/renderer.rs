@@ -7,10 +7,10 @@ use wgpu::{ include_wgsl, util::DeviceExt, TextureUsages};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::{WindowBuilder, Window},
+    window::{WindowBuilder, Window}, dpi::{Size, PhysicalSize},
 };
 
-use crate::controller::controller_input::{ControllerInput, MouseInputType};
+use crate::{controller::controller_input::{ControllerInput, MouseInputType}, constants::{WINDOW_INIT_X, WINDOW_INIT_Y}};
 
 use super::renderer_init::{self};
 
@@ -62,7 +62,7 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
     let mut ctr_sender = Some(controller_sender);
     let event_loop = EventLoop::new();
 
-    let window = WindowBuilder::new().with_title("Driven UnderGround!").with_visible(true).build(&event_loop).unwrap();
+    let window = WindowBuilder::new().with_title("Driven UnderGround!").with_visible(false).with_min_inner_size(Size::Physical(PhysicalSize{width: WINDOW_INIT_X, height: WINDOW_INIT_Y})).build(&event_loop).unwrap();
     
     let (            
         surface,
@@ -72,13 +72,11 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
         mut size,
         bkcolor,
         render_pipeline,
-        vertex_buffer,
         diffuse_bind_group,
-        vertices
     ) = renderer_init::new(&window);
 
     let mut last_render= SystemTime::now();
-
+    window.set_visible(true);
     event_loop.run(move |event, _, control_flow| match event {
         Event::RedrawRequested(window_id) if window_id == window.id() => {
             //we could trigger this Event by calling window.request_redraw(), for example in MainEventsCleared, but rendering right there is faster due to reduced function overhead
@@ -94,6 +92,9 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
                     config.width = size.width;
                     config.height = size.height;
                     surface.configure(&device, &config);
+                    if let Some(ref controller_sender) = ctr_sender{
+                        controller_sender.send(ControllerInput::WindowResized { dimensions: (physical_size.width , physical_size.height )  }).expect("Could not send window resized info to the controller");
+                    }
                 }
             }
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
@@ -123,27 +124,27 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
              => {
             //these if let statements are needed, since the ctr_sender is an option, meaning it can be dropped at runtime
             //this dropping is used in order to stop the controller thread. (SEE above: ctr_sender = None;) This might not be strictly MVC here, but it saves a lot of overhead, since the Window has to be managed by the view here
-            if let Some(controller_sender) = ctr_sender.clone(){
+            if let Some(ref controller_sender) = ctr_sender{
                 controller_sender.send(ControllerInput::KeyboardInput { key: input.virtual_keycode, state : input.state }).expect("Could not send keyboard input details to controller thread!");
             }
             
         }
             WindowEvent::MouseInput { device_id: _, state , button: btn, .. }
              => {
-                if let Some(controller_sender) = ctr_sender.clone(){
+                if let Some(ref controller_sender) = ctr_sender{
                 controller_sender.send(ControllerInput::MouseInput { action: MouseInputType::Click { button: *btn, state: *state } }).expect("Could not send mouse click input details to controller thread!");
                 }
             }
             WindowEvent::CursorLeft { device_id: _ }
              => {
-                    if let Some(controller_sender) = ctr_sender.clone(){
+                    if let Some(ref controller_sender) = ctr_sender{
 
                 controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::LeftWindow }).expect("Could not send cursor left info to controller thread");
                 }   
             }
             WindowEvent::CursorEntered { device_id: _ }
              => {
-                if let Some(controller_sender) = ctr_sender.clone(){
+                if let Some(ref controller_sender) = ctr_sender{
 
                 controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::EnteredWindow }).expect("Could not send cursor entered info to controller thread");
                 }
@@ -151,13 +152,13 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
             WindowEvent::CursorMoved { device_id: _, position, .. }
              => {
 
-                if let Some(controller_sender) = ctr_sender.clone(){
+                if let Some(ref controller_sender) = ctr_sender{
                 controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Move(position.x as f32, position.y as f32) }).expect("Could not send mouse moved input details to controller thread");
                 }
             }
             WindowEvent::MouseWheel { device_id: _, delta, phase , ..}
              => {
-                if let Some(controller_sender) = ctr_sender.clone(){
+                if let Some(ref controller_sender) = ctr_sender{
 
                 controller_sender.send( ControllerInput::MouseInput { action: MouseInputType::Scroll { delta: *delta, phase: *phase } }).expect("Could not send mouse wheel input details to controller thread");
                 }
@@ -176,9 +177,17 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
 
         let time_passed_in_ms = last_render.elapsed().unwrap().as_micros();
 
-        println!("qs passed since last rendering: {}", time_passed_in_ms);
+        //println!("qs passed since last rendering: {}", time_passed_in_ms);
         last_render = now;
 
+        let vertices: Vec<Vertex> = vertex_receiver.recv().unwrap();
+
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
 
         //get the frame to render to

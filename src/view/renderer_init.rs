@@ -6,26 +6,11 @@ use winit::{window::Window, dpi::PhysicalSize};
 use super::{renderer::{Vertex, self}, sprite_loading};
 
 
-struct State {
-    surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
-
-    render_pipeline: wgpu::RenderPipeline,  //The render pipeline is needed for drawing onto a surface, using shaders
-    vertex_buffer: wgpu::Buffer,
-    diffuse_bind_group: wgpu::BindGroup, 
-
-    bkcolor: wgpu::Color,
-    vertices: Vec<Vertex>,
-}
-
 
 
     // Creating some of the wgpu types requires async code
     // in order to use these, the new function needs to be async und thus the whole rendering function, but since it does not return anything, we need pollster in main to block and wait
-    pub fn new(window: &Window) -> (Surface, Device, Queue, SurfaceConfiguration, PhysicalSize<u32>, wgpu::Color, RenderPipeline, wgpu::Buffer, BindGroup, Vec<renderer::Vertex>) {
+    pub fn new(window: &Window) -> (Surface, Device, Queue, SurfaceConfiguration, PhysicalSize<u32>, wgpu::Color, RenderPipeline, BindGroup) {
 
         let size = window.inner_size();
 
@@ -77,24 +62,9 @@ struct State {
         
 
 
-            //create the actual vertices that should be drawn. This could be updated at compile time
-    let vertices: Vec<Vertex> = vec!(
-        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], },
-        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
-        Vertex { position: [-0.0, 1.0],  tex_i: 0, tex_coords: [0.0, 0.0], }, 
-        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], }, 
-        Vertex { position: [1.0, 0.0],  tex_i: 0, tex_coords: [0.5, 0.5], },
-        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
 
 
-    );
 
-        let vertex_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
 
             
         (
@@ -110,9 +80,7 @@ struct State {
                 a: 1.0,
             },
             render_pipeline,
-            vertex_buffer,
             diffuse_bind_group,
-            vertices
         )
     }
      

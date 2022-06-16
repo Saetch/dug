@@ -1,5 +1,5 @@
 
-use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}, time::SystemTime};
+use std::{sync::{Arc, atomic::{AtomicBool, self}, RwLock}, time::SystemTime, thread};
 
 use flume::{Receiver, Sender};
 use tokio::{sync::{oneshot::Sender as AsyncSender, Mutex}, join};
@@ -203,6 +203,7 @@ fn process_keyboard_input(key_input: Option<VirtualKeyCode>, state: ElementState
 }
 #[inline]
 fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
+    //println!("Mouse moved to ({}, {})", x, y);
     let lock = game_state.read().expect("Could not read current gameState in mouse_moved_action!");
     let screen_center_pos = lock.camera_pos;
     let half_screen_width = lock.window_dimensions_ingame.0;
@@ -219,6 +220,9 @@ fn mouse_moved_action(x: f32, y: f32, game_state: &Arc<RwLock<GameState>>){
     let mut lock = game_state.write().expect("Could not save current cursor position to gameState!");
     lock.cursor_pos_relative = c_p_r;
     lock.cursor_pos_ingame = c_p_ig ;
+
+    //println!("cursor relative: {:?}", c_p_r);
+    //println!("cursor ingame: {:?}", c_p_ig);
     drop(lock);
 }
 
@@ -284,20 +288,20 @@ pub async fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: 
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let new_cam_pos = (cam_mov.0 * speed *win_dimensions.0 * delta + camera_pos.0, cam_mov.1 * speed* win_dimensions.1 *  delta + camera_pos.1);
+        println!("new cam pos: {:?}", new_cam_pos);
         let vec2fut = iterate_through_game_objects(&model_pointer, new_cam_pos, win_dimensions);
         let vec1fut = iterate_through_static_objects(&model_pointer, new_cam_pos, win_dimensions);
         
         let (mut ret_vector, additional_vector) = join!(vec1fut, vec2fut);
         ret_vector.extend(additional_vector);
-
-        
+        ret_vector.iter().for_each(|v| println!("{:?}",v ));
         match vertex_sender.send(ret_vector){
             Ok(_) => (),
             Err(e) => println!("{:?}", e),
         }
         if let Some(fps) = loop_helper.report_rate() {
             current_fps = Some(fps);
-            println!("FPS: {:?}", current_fps);
+            //println!("FPS: {:?}", current_fps);
 
         }
 
