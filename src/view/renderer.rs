@@ -209,7 +209,6 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
             }],
             depth_stencil_attachment: None,
         });
-            // NEW!
         render_pass.set_pipeline(&render_pipeline); // 2.
         render_pass.set_bind_group(0, &diffuse_bind_group, &[]);   
         render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
