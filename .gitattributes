@@ -1,0 +1,3 @@
+view/renderer.rs merge=ours
+view/renderer_init.rs merge=ours
+view/sprite_loading.rs merge=ours
