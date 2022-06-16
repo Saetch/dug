@@ -414,43 +414,6 @@ impl State {
         }
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
-
-        
-        match event {
-            WindowEvent::CursorMoved { device_id: _, position: _, modifiers: _ } =>{
-                let mut rng = thread_rng();
-                let val_changed = rng.gen_range(-0.005..=0.005);
-                let typechanged : u8 = rng.gen_range(0..=2);
-                match typechanged {
-                    0 => self.bkcolor.r += val_changed,
-                    1 => self.bkcolor.g +=val_changed,
-                    2 => self.bkcolor.b += val_changed,
-                    _ => ()
-                    
-                }
-            }
-            WindowEvent::KeyboardInput { input: keyboard_input, .. } => {
-                if let winit::event::KeyboardInput {
-                    virtual_keycode: Some(keycode),
-                    state: winit::event::ElementState::Pressed,
-                    ..
-                } = keyboard_input
-                {
-                    match keycode {
-                        winit::event::VirtualKeyCode::Escape => panic!("Exiting"),
-                        _ => (),
-                    }
-                }
-            }
-            
-            _ => ()
-        }
-        false
-    }
-
-    fn update(&mut self) {
-    }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
 
@@ -526,7 +489,7 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == window.id() => if !state.input(event) {match event {
+        } if window_id == window.id() => {match event {
             //These Window-Events are prebaked, we only need to know which ones to respond to and how
             WindowEvent::Resized(physical_size) => {
                 state.resize(*physical_size);
@@ -558,7 +521,6 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
     Event::MainEventsCleared => {
 
         //this event will be continuously submitted
-        state.update();
         match state.render() {
             Ok(_) => {}
             // Reconfigure the surface if lost
