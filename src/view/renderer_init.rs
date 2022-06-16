@@ -1,333 +1,359 @@
+use std::{num::NonZeroU32, time::SystemTime};
 
-/*use std::{sync::{Arc}};
-use vulkano::{
-    descriptor_set::{
-        PersistentDescriptorSet,
-    },
-    device::{
-        physical::{PhysicalDevice, PhysicalDeviceType},
-        Device, DeviceCreateInfo, DeviceExtensions, Features, QueueCreateInfo, Queue,
-    },
-    image::{
-        SwapchainImage, ImageUsage, AttachmentImage, SampleCount,
-    },
-    impl_vertex,
-    instance::{Instance, InstanceCreateInfo},
-    pipeline::{
-        GraphicsPipeline,
-    },
-    render_pass::{  RenderPass},
-    swapchain::{
-         Surface, Swapchain, SwapchainCreateInfo, PresentMode,
-    },
+use wgpu::{TextureUsages, include_wgsl, util::DeviceExt, SurfaceConfiguration, Surface, Device, RenderPipeline, BindGroup, Queue};
+use winit::{window::Window, dpi::PhysicalSize};
 
-};
-use vulkano_win::VkSurfaceBuild;
-use winit::{
-    window::{Window, WindowBuilder}, event_loop::EventLoop, dpi::PhysicalSize,
-};
-use crate::{view::{renderer::{Vertex, vs, fs}, sprite_loading::load_sprites}, constants::{WINDOW_INIT_X, WINDOW_INIT_Y}};
-pub(crate) fn init() -> (Arc<Device>, Arc<Queue>, Arc<GraphicsPipeline>, Vec<Arc<SwapchainImage<Window>>>, Arc<RenderPass>, EventLoop<()>, Arc<Surface<Window>>, Arc<Swapchain<Window>>, Arc<PersistentDescriptorSet>, Arc<AttachmentImage>){
-    // instance
+use super::renderer::{Vertex, self};
 
-// surface
 
-// physical device
-// logical device
-// queue creation
+struct State {
+    surface: wgpu::Surface,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    size: winit::dpi::PhysicalSize<u32>,
 
-// swapchain
+    render_pipeline: wgpu::RenderPipeline,  //The render pipeline is needed for drawing onto a surface, using shaders
+    vertex_buffer: wgpu::Buffer,
+    diffuse_bind_group: wgpu::BindGroup, 
 
-// render pass
-// framebuffers
-// vertex buffer
-// shaders
-// viewport
-// pipeline
-// command buffers
-
-// event loop
+    bkcolor: wgpu::Color,
+    vertices: Vec<Vertex>,
+}
 
 
 
+    // Creating some of the wgpu types requires async code
+    // in order to use these, the new function needs to be async und thus the whole rendering function, but since it does not return anything, we need pollster in main to block and wait
+    pub fn new(window: &Window) -> (Surface, Device, Queue, SurfaceConfiguration, PhysicalSize<u32>, wgpu::Color, RenderPipeline, wgpu::Buffer, BindGroup, Vec<renderer::Vertex>) {
 
+        let size = window.inner_size();
 
-// The first step of any Vulkan program is to create an instance.
-//
-// When we create an instance, we have to pass a list of extensions that we want to enable.
-//
-// All the window-drawing functionalities are part of non-core extensions that we need
-// to enable manually. To do so, we ask the `vulkano_win` crate for the list of extensions
-// required to draw to a window.
-// tell vulkan that we need to load extensions in order to render to the viewport
-let required_extensions = vulkano_win::required_extensions();
-
-// Now creating the instance.
-let instance = Instance::new(InstanceCreateInfo {
-    enabled_extensions: required_extensions,
-    ..Default::default()
-})
-.unwrap();
-
-PhysicalDevice::enumerate(&instance).for_each(|p| println!("device: {} type: {:?} attr: {}", p.properties().device_name, p.properties().device_type, p.properties().max_vertex_input_attributes));
-
-// create the window.
-//
-// This is done by creating a `WindowBuilder` from the `winit` crate, then calling the
-// `build_vk_surface` method provided by the `VkSurfaceBuild` trait from `vulkano_win`. If you
-// ever get an error about `build_vk_surface` being undefined in one of your projects, this
-// probably means that you forgot to import this trait.
-//
-// This returns a `vulkano::swapchain::Surface` object that contains both a cross-platform winit
-// window and a cross-platform Vulkan surface that represents the surface of the window.
-    //create an EventLoop and a surface that correspons to it. Thus we will be able to handle events (changed sizes, mouse clicks, button pressed, refreshs, etc)
-let event_loopi = EventLoop::new();
-let surface = WindowBuilder::new()          //abstraction of object that can be drawn to. Get the actual window by calling surface.window()
-    .with_title("Driven UnderGround!")
-    .with_inner_size(PhysicalSize::new(WINDOW_INIT_X, WINDOW_INIT_Y))
-    .with_visible(false)
-    .build_vk_surface(&event_loopi, instance.clone())
-    .unwrap();
-
-// Choose device extensions that we're going to use.
-// In order to present images to a surface, we need a `Swapchain`, which is provided by the
-// `khr_swapchain` extension.
-let device_extensions = DeviceExtensions {
-    khr_swapchain: true,
-    ..DeviceExtensions::none()
-};
-
-let optimal_features = vulkano::device::Features{
-    sampler_anisotropy: true,
-    ..Features::none()
-};
-
-// We then choose which physical device to use. First, we enumerate all the available physical
-// devices, then apply filters to narrow them down to those that can support our needs.
-let (physical_device, queue_family) = PhysicalDevice::enumerate(&instance)
-    .filter(|&p| {
-
-        // Some devices may not support the extensions or features that your application, or
-        // report properties and limits that are not sufficient for your application. These
-        // should be filtered out here.
-        p.supported_extensions().is_superset_of(&device_extensions) 
-    })
-    .filter_map(|p| {
-        // For each physical device, we try to find a suitable queue family that will execute
-        // our draw commands.
-        //
-        // Devices can provide multiple queues to run commands in parallel (for example a draw
-        // queue and a compute queue), similar to CPU threads. This is something you have to
-        // have to manage manually in Vulkan. Queues of the same type belong to the same
-        // queue family.
-        //
-        // Here, we look for a single queue family that is suitable for our purposes. In a
-        // real-life application, you may want to use a separate dedicated transfer queue to
-        // handle data transfers in parallel with graphics operations. You may also need a
-        // separate queue for compute operations, if your application uses those.
-        p.queue_families()
-            .find(|&q| 
-                // We select a queue family that supports graphics operations. When drawing to
-                // a window surface, as we do in this example, we also need to check that queues
-                // in this queue family are capable of presenting images to the surface.
-                q.supports_graphics() && q.supports_surface(&surface).unwrap_or(false)
-            )
-            // The code here searches for the first queue family that is suitable. If none is
-            // found, `None` is returned to `filter_map`, which disqualifies this physical
-            // device.
-            .map(|q| (p, q))
-    })
-    // All the physical devices that pass the filters above are suitable for the application.
-    // However, not every device is equal, some are preferred over others. Now, we assign
-    // each physical device a score, and pick the device with the
-    // lowest ("best") score.
-    //
-    // In this example, we simply select the best-scoring device to use in the application.
-    // In a real-life setting, you may want to use the best-scoring device only as a
-    // "default" or "recommended" device, and let the user choose the device themselves.
-    .min_by_key(|(p, _)| {
-        // We assign a better score to device types that are likely to be faster/better.
-        match p.properties().device_type {
-            PhysicalDeviceType::DiscreteGpu => 0 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
-            PhysicalDeviceType::IntegratedGpu => 1 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
-            PhysicalDeviceType::VirtualGpu => 2 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
-            PhysicalDeviceType::Cpu => 3 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
-            PhysicalDeviceType::Other => 4 - if p.supported_features().is_superset_of(&optimal_features) { 1 } else { 0 },
-        }
-    })
-    .unwrap();
-
-// Some little debug infos.
-println!(
-    "Using device: {} (type: {:?})",
-    physical_device.properties().device_name,
-    physical_device.properties().device_type,
-);
-
-// Now initializing the device. This is probably the most important object of Vulkan.
-// This basically boils down to loading vulkan
-// queues are our wires that can be used to talk to the GPU
-// The iterator of created queues is returned by the function alongside the device.
-let (device, mut queues) = Device::new(
-    // Which physical device to connect to.
-    physical_device,
-    DeviceCreateInfo {
-        // A list of optional features and extensions that our program needs to work correctly.
-        // Some parts of the Vulkan specs are optional and must be enabled manually at device
-        // creation. In this example the only thing we are going to need is the `khr_swapchain`
-        // extension that allows us to draw to a window.
-        enabled_extensions: physical_device
-            // Some devices require certain extensions to be enabled if they are present
-            // (e.g. `khr_portability_subset`). We add them to the device extensions that we're
-            // going to enable.
-            .required_extensions()
-            .union(&device_extensions),
-        //add necessary features for runtime buffer array
-        enabled_features: Features {
-                descriptor_indexing: true,
-                shader_uniform_buffer_array_non_uniform_indexing: true,
-                runtime_descriptor_array: true,
-                descriptor_binding_variable_descriptor_count: true,
-                ..Features::none()
+        // The instance is a handle to our GPU
+        // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
+        let instance = wgpu::Instance::new(wgpu::Backends::VULKAN);
+        let surface = unsafe { instance.create_surface(window) };
+        let adapter = pollster::block_on(instance.request_adapter(
+            &wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
             },
+        )).unwrap();   
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                features: (wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER | /* <-- this is a bitwise operator, not a logical OR */ wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
+                | wgpu::Features::TEXTURE_BINDING_ARRAY),            //you can get a list of supported features by calling adapter.features() or device.features()
 
-        // The list of queues that we are going to use. Here we only use one queue, from the
-        // previously chosen queue family.
-        queue_create_infos: vec![QueueCreateInfo::family(queue_family)],
+                limits: wgpu::Limits::default(),
+                
+                label: None,
+            },
+            None, // Trace path
+        )).unwrap();
 
-        ..Default::default()
-    },
-)
-.unwrap();
 
-// Since we can request multiple queues, the `queues` variable is in fact an iterator. We
-// only use one queue in this example, so we just retrieve the first and only element of the
-// iterator.
-let queue = queues.next().unwrap();             //we can just get the first queue from the family. These are all essentially the same, it's just that only one thread can use one queue, so in order to work with different queues, different threads are needed and vice versa, but this is quite complex
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface.get_preferred_format(&adapter).unwrap(),
+            width: size.width,                      //should not be 0, otherwise it might crash
+            height: size.height,                    //should not be 0, otherwise it might crash
+            present_mode: wgpu::PresentMode::Fifo,           //Fifo corresponds to V-Sync, waiting for refresh, Mailbox will stop visible tearing, but impact performance slightly, immediate fastest, but with some tearing
+        };
+        surface.configure(&device, &config);
 
-// Before we can draw on the surface, we have to create what is called a swapchain. Creating
-// a swapchain allocates the color buffers that will contain the image that will ultimately
-// be visible on the screen. These images are returned alongside the swapchain.
-let (swapchain, images) = {
-    // Querying the capabilities of the surface. When we create the swapchain we can only
-    // pass values that are allowed by the capabilities.
-    let surface_capabilities = physical_device
-        .surface_capabilities(&surface, Default::default())
-        .unwrap();
 
-    // Choosing the internal format that the images will have.
-    let image_format = Some(
-        physical_device
-            .surface_formats(&surface, Default::default())
-            .unwrap()[0]
-            .0,
+        //loading an image from a file
+        let diffuse_bytes = include_bytes!("../../textures/image_img.png");
+        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
+        let diffuse_rgba = diffuse_image.to_rgba8();
+
+        use image::GenericImageView;
+        let dimensions = diffuse_image.dimensions();
+
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+
+        let diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
+
+            label: Some("distinct texture"),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::COPY_DST | TextureUsages::COPY_SRC | TextureUsages::TEXTURE_BINDING,
+            
+        });
+
+        //this execute a write on the gpu from the loaded image pixel data into our created texture
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            diffuse_rgba.into_raw().as_slice(),
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
+        );
+
+
+        let diffuse_bytes = include_bytes!("../../textures/Dwarf_BaseHouse.png");
+        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
+        let diffuse_rgba = diffuse_image.to_rgba8();
+
+        let dimensions = diffuse_image.dimensions();
+
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+
+        let second_diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
+
+            label: Some("distinct texture"),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::COPY_DST | TextureUsages::COPY_SRC | TextureUsages::TEXTURE_BINDING,
+            
+        });
+        
+        //this execute a write on the gpu from the loaded image pixel data into our created texture
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &second_diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            diffuse_rgba.into_raw().as_slice(),
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
+        );
+        
+
+/*      This is another way to load an image, but it is not as easy to use as the one above (not as flexible), tho more slim
+    
+        let diffuse_texture = {
+            let img_data = include_bytes!("../image_img.png");
+            let decoder = png::Decoder::new(std::io::Cursor::new(img_data));
+            let mut reader = decoder.read_info().unwrap();
+            let mut buf = vec![0; reader.output_buffer_size()];
+            let info = reader.next_frame(&mut buf).unwrap();
+
+            let size = wgpu::Extent3d {
+                width: info.width,
+                height: info.height,
+                depth_or_array_layers: 1,
+            };
+            let texture_format = wgpu::TextureFormat::Rgba8UnormSrgb;
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: None,
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: texture_format,
+                usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+            });
+            queue.write_texture(
+                texture.as_image_copy(),
+                &buf,
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: std::num::NonZeroU32::new(info.width * 4),
+                    rows_per_image: None,
+                },
+                size,
+            );
+            texture
+        };*/
+
+
+
+        // We don't need to configure the texture view much, so let's
+        // let wgpu define it.
+        let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());        //create a handle to access the texture we just created
+        let second_diffuse_texture_view = second_diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());        //create a handle to access the texture we just created
+        
+        let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {                                      //a sampler will accept coordinates (X/Y) and return the color data. So this object is asked when the texture is the source of any color operation
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()                        //rest of the fields are initialized with default values
+        });
+
+
+        
+        let texture_view_array = [
+            &diffuse_texture_view,
+            &second_diffuse_texture_view,
+        ];
+
+        //bind groups describe resources that a shaders has access to
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[                     //2 Entries: 1st: Texture, 2nd: Sampler for texture
+                    wgpu::BindGroupLayoutEntry {    
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: NonZeroU32::new(2),
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        // This should match the filterable field of the
+                        // corresponding Texture entry above.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
+
+
+            //create the actual bind group based on the bind-group-layout. This looks almost identical tho, but it means you could switch these out
+            let diffuse_bind_group = device.create_bind_group(
+                &wgpu::BindGroupDescriptor {
+                    layout: &texture_bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureViewArray(&texture_view_array),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
+                        }
+                    ],
+                    label: Some("diffuse_bind_group"),
+                }
+            );
+            
+
+
+        let shader = device.create_shader_module(&include_wgsl!("shader.wgsl"));       //here, we could also put the contents of shader.wgsl as a String into the program, but loading it from a file is more convenient. Make sure to have WGSL extension installed if you want to edit the shader.wgsl file
+        
+
+        let render_pipeline_layout =
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[&texture_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main", // 1.
+                buffers: &[
+                    Vertex::desc(),                                 //insert the vertex buffer that was created above
+                ], // 2.
+            },
+            fragment: Some(wgpu::FragmentState { // 3.              //fragment is optional and thus wrapped in Some(), this is needed for storing color on the surface
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[wgpu::ColorTargetState { // 4.
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),         //replace pixels instead of blending
+                    write_mask: wgpu::ColorWrites::ALL,             //specify color channels (R, G, B or similiar) that can be written to. Others will be ignored 
+                }],
+            }),    
+                primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList, // 1.  //every 3 vertices in order are considered a triangle
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw, // 2.            //Ccw: Counter-clockwise. This means, that if the vertices are ordered counter-clockwise, the triangle is facing us (only the front is visible)
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },    depth_stencil: None, // 1.
+            multisample: wgpu::MultisampleState {
+                count: 1, // 2.
+                mask: !0, // 3.
+                alpha_to_coverage_enabled: false, // 4.
+            },
+            multiview: None, // 5.
+        });
+
+            //create the actual vertices that should be drawn. This could be updated at compile time
+    let vertices: Vec<Vertex> = vec!(
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
+        Vertex { position: [-0.0, 1.0],  tex_i: 0, tex_coords: [0.0, 0.0], }, 
+        Vertex { position: [-0.0, 0.0], tex_i: 0, tex_coords: [0.0, 0.5], }, 
+        Vertex { position: [1.0, 0.0],  tex_i: 0, tex_coords: [0.5, 0.5], },
+        Vertex { position: [1.0, 1.0],  tex_i: 0, tex_coords: [0.5, 0.0], }, 
+
+
     );
 
-    // Please take a look at the docs for the meaning of the parameters we didn't mention.
-    Swapchain::new(
-        device.clone(),
-        surface.clone(),
-        SwapchainCreateInfo {                                   //this new function returns  an Arc<Swapchain<Window>> aswell as a Vec<Arc<SwapChainImage<Window>>> in a tuple ( , )
-            min_image_count: surface_capabilities.min_image_count +1,       // How many buffers to use in the swapchain
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-            image_format,
-            // The dimensions of the window, only used to initially setup the swapchain.
-            // NOTE:
-            // On some drivers the swapchain dimensions are specified by
-            // `surface_capabilities.current_extent` and the swapchain size must use these
-            // dimensions.
-            // These dimensions are always the same as the window dimensions.
-            //
-            // However, other drivers don't specify a value, i.e.
-            // `surface_capabilities.current_extent` is `None`. These drivers will allow
-            // anything, but the only sensible value is the window
-            // dimensions.
-            //
-            // Both of these cases need the swapchain to use the window dimensions, so we just
-            // use that.
-            image_extent: surface.window().inner_size().into(),
-
-            image_usage: ImageUsage::color_attachment(),        // What the images are going to be used for
-
-            // The alpha mode indicates how the alpha value of the final image will behave. For
-            // example, you can choose whether the window will be opaque or transparent.
-            composite_alpha: surface_capabilities
-                .supported_composite_alpha
-                .iter()
-                .next()
-                .unwrap(),
-            present_mode: PresentMode::Immediate,
-            ..Default::default()
-        },
-    )
-    .unwrap()
-};
-
-    // Creating our intermediate multisampled image.
-    //
-    // As explained in the introduction, we pass the same dimensions and format as for the final
-    // image. But we also pass the number of samples-per-pixel, which is 4 here.
-    let intermediary = AttachmentImage::transient_multisampled(
-        device.clone(),
-        [1920, 1080],
-        SampleCount::Sample4,
-        vulkano::format::Format::R8G8B8A8_UNORM,
-    )
-    .unwrap();
-
-impl_vertex!(Vertex, position, tex_i, coords);
+            let moment = SystemTime::now();
 
 
-let vs = vs::load(device.clone()).unwrap();
-let fs = fs::load(device.clone()).unwrap();
-
-// At this point, OpenGL initialization would be finished. However in Vulkan it is not. OpenGL
-// implicitly does a lot of computation whenever you draw. In Vulkan, you have to do all this
-// manually.
-
-// The next step is to create a *render pass*, which is an object that describes where the
-// output of the graphics pipeline will go. It describes the layout of the images
-// where the colors, depth and/or stencil information will be written.
-let render_pass = vulkano::single_pass_renderpass!(
-    device.clone(),
-    attachments: {
-        // `color` is a custom name we give to the first and only attachment.
-        color: {
-            // `load: Clear` means that we ask the GPU to clear the content of this
-            // attachment at the start of the drawing.
-            load: Clear,
-            // `store: Store` means that we ask the GPU to store the output of the draw
-            // in the actual image. We could also ask it to discard the result.
-            store: Store,
-            // `format: <ty>` indicates the type of the format of the image. This has to
-            // be one of the types of the `vulkano::format` module (or alternatively one
-            // of your structs that implements the `FormatDesc` trait). Here we use the
-            // same format as the swapchain.
-            format: swapchain.image_format(),
-            // TODO:
-            samples: 1,
-        }
-    },
-    pass: {
-        // We use the attachment named `color` as the one and only color attachment.
-        color: [color],
-        // No depth-stencil attachment is indicated with empty brackets.
-        depth_stencil: {}
+            
+        (
+            surface,
+            device,
+            queue,
+            config,
+            size,
+            wgpu::Color {            
+                r: 0.2,
+                g: 0.2,
+                b: 0.2,
+                a: 1.0,
+            },
+            render_pipeline,
+            vertex_buffer,
+            diffuse_bind_group,
+            vertices
+        )
     }
-)
-.unwrap();
+     
 
-
-
-
-
-
-
-
-
-
-let (pipeline, descriptor_set) = load_sprites(device.clone(), queue.clone(), render_pass.clone(), vs.clone(), fs.clone());
-
-
-return (device, queue, pipeline, images, render_pass, event_loopi, surface,  swapchain, descriptor_set, intermediary)
-}*/
+ 
