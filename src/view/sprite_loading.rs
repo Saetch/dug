@@ -3,7 +3,7 @@ use std::{sync::Arc, io::Cursor};
 use vulkano::{pipeline::{GraphicsPipeline, PipelineLayout, layout::PipelineLayoutCreateInfo, graphics::{vertex_input::BuffersDefinition, viewport::ViewportState, color_blend::ColorBlendState}, Pipeline}, descriptor_set::{PersistentDescriptorSet, layout::{DescriptorSetLayoutCreateInfo, DescriptorSetLayout, DescriptorSetLayoutCreationError}, WriteDescriptorSet}, image::{ImageDimensions, ImmutableImage, MipmapsCount, view::ImageView}, format::Format, sampler::{Sampler, SamplerCreateInfo, Filter, SamplerAddressMode}, render_pass::{Subpass, RenderPass}, device::{Queue, Device}, shader::ShaderModule};
 
 use super::renderer::Vertex;
-
+//do not delete this, it should be kept on this branch
 //SEE vulkano examples -> image-self-copy-blit for an example on how to use StorageImages, to store imageInfo and on how to use ImageCopies in render passes
 
 pub(crate) fn load_sprites(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, vs: Arc<ShaderModule>, fs: Arc<ShaderModule>)-> (Arc<GraphicsPipeline>, Arc<PersistentDescriptorSet>){
