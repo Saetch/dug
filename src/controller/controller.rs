@@ -288,13 +288,11 @@ pub async fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: 
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let new_cam_pos = (cam_mov.0 * speed *win_dimensions.0 * delta + camera_pos.0, cam_mov.1 * speed* win_dimensions.1 *  delta + camera_pos.1);
-        println!("new cam pos: {:?}", new_cam_pos);
         let vec2fut = iterate_through_game_objects(&model_pointer, new_cam_pos, win_dimensions);
         let vec1fut = iterate_through_static_objects(&model_pointer, new_cam_pos, win_dimensions);
         
         let (mut ret_vector, additional_vector) = join!(vec1fut, vec2fut);
         ret_vector.extend(additional_vector);
-        ret_vector.iter().for_each(|v| println!("{:?}",v ));
         match vertex_sender.send(ret_vector){
             Ok(_) => (),
             Err(e) => println!("{:?}", e),
