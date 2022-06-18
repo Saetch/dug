@@ -62,7 +62,6 @@ fn start_threads(rt: Handle)-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInp
 
     let thread_running = running.clone();
 
-
     let thread_game_state = game_state_arc.clone();
     //let (wakeup_sender, wakeup_receiver) = flume::bounded(1);             //if decided to wake up the controller communication thread instead of letting it run all the time
     let thread_rt = rt.clone();
