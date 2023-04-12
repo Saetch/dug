@@ -44,7 +44,7 @@ pub fn handle_input_loop(thread_running: Arc<AtomicBool>, receiver: Receiver<Con
         
     }
 
-    println!("Oh no! I'm getting terminated! Brhsshh!");
+    println!("Oh no! I'm getting terminated! Brhsshh! That's the end of the handle_input_loop");
 
 }
 

@@ -30,6 +30,7 @@ fn main(){
         //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
         //otherwise it will lead to cross-platform compatibility problems
         rt.block_on(wgpu_render(threads_vec, running, controller_sender, vertex_receiver, rt.clone()));
+        //THIS WILL NEVER RETURN. inside wgpu_render there will be an exit called which subsequently ends the whole application (only after waiting for the threads to be joined)
     }
 
 }
@@ -79,6 +80,7 @@ fn start_threads(rt: Handle)-> (Vec<JoinHandle<()>>, flume::Sender<ControllerInp
 
 
     return (vec![model_thread, controller_thread, controller_communication_thread], sender, vertex_receiver, running );
+
 }
 
 /**

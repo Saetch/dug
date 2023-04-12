@@ -115,7 +115,7 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
                 while let Some(cur_thread) = threads_vec.pop() {
                     cur_thread.join().unwrap();
                 }
-                
+                println!("Gracefully exiting ...");
                 *control_flow = ControlFlow::Exit;
 
             }

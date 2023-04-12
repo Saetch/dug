@@ -50,7 +50,7 @@ impl Model {
             
             sleep(Duration::from_millis(10000));
         }
-        println!("Oh no! I'm getting terminated! Brhsshh!");
+        println!("Oh no! I'm getting terminated! Brhsshh! That's the end of the model_loop!");
     }
 
 
