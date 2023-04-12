@@ -265,7 +265,7 @@ pub async fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: 
 
    
     let mut loop_helper = LoopHelper::builder()
-    .report_interval_s(1.0) // report every half a second
+    .report_interval_s(1.0) 
     .build_with_target_rate(102.0); // limit to FPS if possible
     let mut current_fps = None;
     let mut delta: f64 = 0.0;
@@ -288,10 +288,10 @@ pub async fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: 
         let win_dimensions = lock.window_dimensions_ingame;
         drop(lock);
         let new_cam_pos = (cam_mov.0 * speed *win_dimensions.0 * delta + camera_pos.0, cam_mov.1 * speed* win_dimensions.1 *  delta + camera_pos.1);
-        let vec2fut = iterate_through_game_objects(&model_pointer, new_cam_pos, win_dimensions);
         let vec1fut = iterate_through_static_objects(&model_pointer, new_cam_pos, win_dimensions);
+        let vec2fut = iterate_through_game_objects(&model_pointer, new_cam_pos, win_dimensions);
         
-        let (mut ret_vector, additional_vector) = join!(vec1fut, vec2fut);
+        let (mut ret_vector, additional_vector) = join!(vec1fut, vec2fut);  //this is async, but single threaded, which will result in the computation continuing even if one of the two vectors are currently occupied
         ret_vector.extend(additional_vector);
         match vertex_sender.send(ret_vector){
             Ok(_) => (),
@@ -303,7 +303,7 @@ pub async fn handle_communication_loop(running: Arc<AtomicBool>, vertex_sender: 
 
         }
 
-        loop_helper.loop_sleep(); // sleeps to acheive a 250 FPS rate
+        loop_helper.loop_sleep(); // sleeps to achieve a X FPS rate This is a crate function and not just a regular sleep
 
         game_state.write().unwrap().camera_pos = new_cam_pos;
         delta = loop_helper.loop_start_s(); // or .loop_start_s() for f64 seconds

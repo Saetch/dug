@@ -1,11 +1,11 @@
-use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, RwLock}};
+use std::{thread::{ spawn, self, JoinHandle}, sync::{Arc,  atomic::AtomicBool, RwLock}, env};
 use constants::{WINDOW_INIT_X, WINDOW_INIT_Y};
 use controller::{controller_input::ControllerInput, controller::handle_communication_loop, game_state::GameState};
 use flume::Receiver;
 extern crate jpeg_decoder as jpeg;
 use model::{model::{ Model}};
 use tokio::{runtime::{Handle}};
-use view::renderer::Vertex;
+use view::{renderer::Vertex, dummy_renderer};
 use crate::{view::renderer::wgpu_render, controller::controller::handle_input_loop};
 mod controller;
 mod view;
@@ -14,6 +14,7 @@ mod constants;
 mod model;
 
 fn main(){
+    let args: Vec<String> = env::args().collect();
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rt = rt.handle();                               //Cloning a reference to a Handle returns a Copy of an actual Handle
     let (threads_vec,
@@ -22,9 +23,15 @@ fn main(){
          running)
           = start_threads(rt.clone());
 
-    //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
-    //otherwise it will lead to cross-platform compatibility problems
-  rt.block_on(wgpu_render(threads_vec, running, controller_sender, vertex_receiver, rt.clone()));
+
+    if args.contains(&String::from("--no-GUI")){
+        rt.block_on(dummy_renderer::go(threads_vec, running, controller_sender, vertex_receiver, rt.clone()));
+    }else{
+        //this will lock the current thread (main) in the event loop. Since this creates a new Window, it should be called from the main thread,
+        //otherwise it will lead to cross-platform compatibility problems
+        rt.block_on(wgpu_render(threads_vec, running, controller_sender, vertex_receiver, rt.clone()));
+    }
+
 }
 
 

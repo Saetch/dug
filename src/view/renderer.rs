@@ -74,7 +74,6 @@ pub(crate) async fn wgpu_render( mut threads_vec: Vec<JoinHandle<()>>, running: 
         render_pipeline,
         diffuse_bind_group,
     ) = renderer_init::new(&window);
-
     let mut last_render= SystemTime::now();
     window.set_visible(true);
     event_loop.run(move |event, _, control_flow| match event {
