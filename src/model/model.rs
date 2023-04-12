@@ -95,7 +95,12 @@ impl Model {
     
             lock.push(Box::new(new_debug_object));
         }
-
+        /** //load test, this will just put X amount of images at 0.01/0.0 to check how many images can be procecced. Make sure to enable FPS display in controller->handle_communication_loop
+        for i in 0..10_000{
+            let new_debug_object = DebugObject::new_with_size((0.01 , 0.0 ), 1, 0.1);
+        
+            lock.push(Box::new(new_debug_object));
+        } */
 
 
         //this is supposed to be the amount of static objects that make up one row in the current level.
