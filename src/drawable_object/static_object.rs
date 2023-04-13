@@ -1,6 +1,6 @@
 
 
-//these objects are meant to be used as the background or anything static, that does not need any logic to run on it
+//these objects are meant to be used as the background or anything static, without any logic attached to it
 pub struct StaticObject{
     pub texture_id: u16,
     pub position: (f64, f64),
