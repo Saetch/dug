@@ -248,7 +248,10 @@ pub fn process_mouse_scroll(delta: MouseScrollDelta, game_state: &Arc<RwLock<Gam
     match delta {
         MouseScrollDelta::LineDelta(_horizontal, vertical) => {
             let mut lock = game_state.write().expect("Could not write to gameState on mouse scroll!");
-            lock.window_dimensions_ingame = (lock.window_dimensions_ingame.0 - vertical as f64*0.1, lock.window_dimensions_ingame.1 - vertical as f64* 0.1);
+            println!("{:?} --> {:?}", lock.window_dimensions, lock.window_dimensions_ingame);
+            let change = (vertical as f64 *( 0.1 * lock.window_dimensions_ratio),  vertical as f64 * (0.1 / lock.window_dimensions_ratio));
+            println!("change: {:?}",change);
+            lock.window_dimensions_ingame = (lock.window_dimensions_ingame.0 - change.0, lock.window_dimensions_ingame.1 - change.1);
             drop(lock); //could have given ownership to recalculate_mouse_pos instead and thus circumvented another read->write access, but this type of performance optimization should not be necessary
             recalculate_mouse_pos(game_state);
         },
